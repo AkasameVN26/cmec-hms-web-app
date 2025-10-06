@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, Form, Input, Button, Select, DatePicker, message, Row, Col } from 'antd';
+import { Card, Form, Input, Button, Select, DatePicker, message, Row, Col, InputNumber } from 'antd';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
@@ -89,6 +89,18 @@ const AddAccountPage = () => {
               <Col span={12}>
                 <Form.Item name="kinh_nghiem" label="Kinh nghiệm">
                   <Input.TextArea />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="tien_luong" label="Tiền lương (VND)">
+                    <InputNumber 
+                        style={{ width: '100%' }} 
+                        min={0} 
+                        formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
+                        parser={(value) => Number(value!.replace(/\./g, ''))}
+                    />
                 </Form.Item>
               </Col>
             </Row>

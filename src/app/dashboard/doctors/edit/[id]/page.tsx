@@ -66,7 +66,7 @@ const EditDoctorPage = ({ params }: { params: { id: string } }) => {
           <Input />
         </Form.Item>
         <Form.Item name="tien_luong" label="Tiền lương (VND)">
-          <InputNumber min={0} style={{ width: '100%' }} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')} parser={(value) => value!.replace(/\./g, '')} />
+          <InputNumber min={0} style={{ width: '100%' }} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')} parser={(value) => Number(value!.replace(/\./g, ''))} />
         </Form.Item>
         <Form.Item name="ngay_sinh" label="Ngày sinh" rules={[{ required: true }]}>
           <DatePicker style={{ width: '100%' }} />
