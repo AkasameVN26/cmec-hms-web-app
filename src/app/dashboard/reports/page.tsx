@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 const ReportsPage = () => {
   const [appointmentCount, setAppointmentCount] = useState(0);
   const [inpatients, setInpatients] = useState<any[]>([]);
-  const [revenue, setRevenue] = useState(0);
+  const [revenue, setRevenue] = useState({ totalFees: 0, totalSalaries: 0, netRevenue: 0 });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -41,16 +41,29 @@ const ReportsPage = () => {
   };
 
   const onRevenueFinish = async (values: any) => {
-    const { startDate, endDate } = values;
-    const { data, error } = await supabase
+    if (!values.month) return;
+
+    const year = values.month.year();
+    const month = values.month.month();
+    const startDate = new Date(year, month, 1).toISOString();
+    const endDate = new Date(year, month + 1, 0).toISOString();
+
+    const { data: feesData, error: feesError } = await supabase
       .from('lich_kham')
       .select('chi_phi_kham')
-      .gte('thoi_gian_kham', startDate.toISOString())
-      .lte('thoi_gian_kham', endDate.toISOString());
-    if (data) {
-      const totalRevenue = data.reduce((acc, item) => acc + (item.chi_phi_kham || 0), 0);
-      setRevenue(totalRevenue);
-    }
+      .gte('thoi_gian_kham', startDate)
+      .lte('thoi_gian_kham', endDate)
+      .eq('trang_thai', 'Đã Khám');
+
+    const { data: salariesData, error: salariesError } = await supabase
+      .from('bac_si')
+      .select('tien_luong');
+
+    const totalFees = feesData ? feesData.reduce((acc, item) => acc + (item.chi_phi_kham || 0), 0) : 0;
+    const totalSalaries = salariesData ? salariesData.reduce((acc, item) => acc + (item.tien_luong || 0), 0) : 0;
+    const netRevenue = totalFees - totalSalaries;
+
+    setRevenue({ totalFees, totalSalaries, netRevenue });
   };
 
   const inpatientColumns = [
@@ -86,17 +99,24 @@ const ReportsPage = () => {
       <Col span={24}>
         <Card title="Thống kê doanh thu">
           <Form onFinish={onRevenueFinish} layout="inline">
-            <Form.Item name="startDate" label="Từ ngày">
-              <DatePicker />
-            </Form.Item>
-            <Form.Item name="endDate" label="Đến ngày">
-              <DatePicker />
+            <Form.Item name="month" label="Chọn tháng">
+              <DatePicker.MonthPicker />
             </Form.Item>
             <Form.Item>
               <Button htmlType="submit">Xem</Button>
             </Form.Item>
           </Form>
-          <Statistic title="Tổng doanh thu" value={revenue} precision={0} suffix="VND" style={{ marginTop: 16 }} />
+          <Row gutter={16} style={{ marginTop: 16 }}>
+            <Col span={8}>
+              <Statistic title="Tổng chi phí khám" value={revenue.totalFees} precision={0} suffix="VND" />
+            </Col>
+            <Col span={8}>
+              <Statistic title="Tổng lương bác sĩ" value={revenue.totalSalaries} precision={0} suffix="VND" />
+            </Col>
+            <Col span={8}>
+              <Statistic title="Doanh thu" value={revenue.netRevenue} precision={0} suffix="VND" />
+            </Col>
+          </Row>
         </Card>
       </Col>
       <Col span={24}>

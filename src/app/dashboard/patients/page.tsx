@@ -18,8 +18,21 @@ const PatientsPage = () => {
 
   useEffect(() => {
     const fetchDoctors = async () => {
-      const { data, error } = await supabase.from('bac_si').select('id_bac_si, ho_ten');
-      if (data) setDoctors(data);
+      const { data, error } = await supabase.from('bac_si').select('id_bac_si, ho_ten, chuyen_khoa');
+      if (data) {
+        const getLastName = (fullName: string) => {
+          const parts = fullName.split(' ');
+          return parts[parts.length - 1];
+        };
+        
+        const sortedData = data.sort((a, b) => {
+          const lastNameA = getLastName(a.ho_ten);
+          const lastNameB = getLastName(b.ho_ten);
+          return lastNameA.localeCompare(lastNameB, 'vi', { sensitivity: 'base' });
+        });
+
+        setDoctors(sortedData);
+      }
     };
     fetchDoctors();
     fetchInitialPatients();
@@ -140,7 +153,7 @@ const PatientsPage = () => {
               <Form.Item name="id_bac_si" label="Tra cứu theo bác sĩ khám">
                 <Select placeholder="Chọn bác sĩ" allowClear>
                   {doctors.map(doctor => (
-                    <Option key={doctor.id_bac_si} value={doctor.id_bac_si}>{doctor.ho_ten}</Option>
+                    <Option key={doctor.id_bac_si} value={doctor.id_bac_si}>{`${doctor.ho_ten} (${doctor.chuyen_khoa})`}</Option>
                   ))}
                 </Select>
               </Form.Item>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, Form, Button, Select, DatePicker, Input, message, Row, Col, Modal, Spin } from 'antd';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
@@ -16,11 +16,27 @@ const NewAppointmentPage = () => {
   const [patientLoading, setPatientLoading] = useState(false);
   const [searchingPatients, setSearchingPatients] = useState(false);
   const [searchingDoctors, setSearchingDoctors] = useState(false);
-  const [searchingRooms, setSearchingRooms] = useState(false);
   const [isPatientModalVisible, setIsPatientModalVisible] = useState(false);
   const router = useRouter();
   const [form] = Form.useForm();
   const [patientForm] = Form.useForm();
+
+  useEffect(() => {
+    const fetchAllRooms = async () => {
+      const { data, error } = await supabase
+        .from('phong_kham')
+        .select('id_phong_kham, ten_phong_kham, vi_tri');
+      
+      if (data) {
+        const sortedData = data.sort((a, b) => 
+          a.ten_phong_kham.localeCompare(b.ten_phong_kham, 'vi', { sensitivity: 'base' })
+        );
+        setRooms(sortedData);
+      }
+    };
+
+    fetchAllRooms();
+  }, []);
 
   const disabledDate = (current: any) => {
     // Can not select days before today
@@ -41,19 +57,7 @@ const NewAppointmentPage = () => {
     }
   };
 
-  const handleRoomSearch = async (value: string) => {
-    if (value) {
-      setSearchingRooms(true);
-      const { data } = await supabase
-        .from('phong_kham')
-        .select('id_phong_kham, ten_phong_kham')
-        .ilike('ten_phong_kham', `%${value}%`);
-      if (data) setRooms(data);
-      setSearchingRooms(false);
-    } else {
-      setRooms([]);
-    }
-  };
+
 
   const getShift = (time: dayjs.Dayjs): string | null => {
     const hour = time.hour();
@@ -92,11 +96,22 @@ const NewAppointmentPage = () => {
       const doctorIds = shiftData.map(s => s.id_bac_si);
       const { data: doctorsData, error: doctorsError } = await supabase
         .from('bac_si')
-        .select('id_bac_si, ho_ten')
+        .select('id_bac_si, ho_ten, chuyen_khoa')
         .in('id_bac_si', doctorIds);
 
       if (doctorsData) {
-        setDoctors(doctorsData);
+        const getLastName = (fullName: string) => {
+          const parts = fullName.split(' ');
+          return parts[parts.length - 1];
+        };
+        
+        const sortedData = doctorsData.sort((a, b) => {
+          const lastNameA = getLastName(a.ho_ten);
+          const lastNameB = getLastName(b.ho_ten);
+          return lastNameA.localeCompare(lastNameB, 'vi', { sensitivity: 'base' });
+        });
+
+        setDoctors(sortedData);
       } else {
         message.error('Không thể tải danh sách bác sĩ.');
       }
@@ -159,7 +174,7 @@ const NewAppointmentPage = () => {
                   loading={searchingDoctors}
                   disabled={doctors.length === 0}
                 >
-                  {doctors.map(d => <Option key={d.id_bac_si} value={d.id_bac_si}>{d.ho_ten}</Option>)}
+                  {doctors.map(d => <Option key={d.id_bac_si} value={d.id_bac_si}>{`${d.ho_ten} (${d.chuyen_khoa})`}</Option>)}
                 </Select>
               </Form.Item>
             </Col>
@@ -191,14 +206,10 @@ const NewAppointmentPage = () => {
             <Col span={12}>
               <Form.Item name="id_phong_kham" label="Phòng khám" rules={[{ required: true }]}>
                 <Select 
-                  placeholder="Nhập tên phòng khám để tìm kiếm"
+                  placeholder="Chọn phòng khám"
                   showSearch
-                  onSearch={handleRoomSearch}
-                  loading={searchingRooms}
-                  filterOption={false}
-                  notFoundContent={searchingRooms ? <Spin size="small" /> : 'Không tìm thấy phòng khám'}
                 >
-                  {rooms.map(r => <Option key={r.id_phong_kham} value={r.id_phong_kham}>{r.ten_phong_kham}</Option>)}
+                  {rooms.map(r => <Option key={r.id_phong_kham} value={r.id_phong_kham}>{`${r.ten_phong_kham} (${r.vi_tri})`}</Option>)}
                 </Select>
               </Form.Item>
             </Col>
