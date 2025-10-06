@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { Card, Table, DatePicker, Button, Form, Row, Col, Statistic } from 'antd';
 import { supabase } from '@/lib/supabase';
-import { Line } from '@ant-design/charts';
+import dynamic from 'next/dynamic';
 import dayjs, { Dayjs } from 'dayjs';
+
+const Line = dynamic(() => import('@ant-design/charts').then((mod) => mod.Line), { ssr: false });
 
 const ReportsPage = () => {
   const [appointmentCount, setAppointmentCount] = useState(0);
@@ -13,6 +15,7 @@ const ReportsPage = () => {
   const [loading, setLoading] = useState(false);
   const [establishmentDate, setEstablishmentDate] = useState<Dayjs | null>(null);
   const [startMonth, setStartMonth] = useState<Dayjs | null>(null);
+  const [periodTotals, setPeriodTotals] = useState({ fees: 0, salaries: 0, profit: 0 });
 
   useEffect(() => {
     fetchInpatients();
@@ -56,13 +59,18 @@ const ReportsPage = () => {
     if (!startMonth || !endMonth) return;
 
     setLoading(true);
+    setChartData([]);
+    setPeriodTotals({ fees: 0, salaries: 0, profit: 0 });
     const results = [];
     let currentMonth = startMonth.clone();
+    
+    let grandTotalFees = 0;
+    let grandTotalSalaries = 0;
 
     const { data: salariesData, error: salariesError } = await supabase
       .from('bac_si')
       .select('tien_luong');
-    const totalSalaries = salariesData ? salariesData.reduce((acc, item) => acc + (item.tien_luong || 0), 0) : 0;
+    const monthlyTotalSalaries = salariesData ? salariesData.reduce((acc, item) => acc + (item.tien_luong || 0), 0) : 0;
 
     while (currentMonth.isBefore(endMonth) || currentMonth.isSame(endMonth, 'month')) {
       const year = currentMonth.year();
@@ -78,15 +86,24 @@ const ReportsPage = () => {
         .eq('trang_thai', 'Đã Khám');
 
       const totalFees = feesData ? feesData.reduce((acc, item) => acc + (item.chi_phi_kham || 0), 0) : 0;
-      const netRevenue = totalFees - totalSalaries;
+      const netRevenue = totalFees - monthlyTotalSalaries;
       const monthStr = currentMonth.format('YYYY-MM');
 
-      results.push({ month: monthStr, value: totalFees, category: 'Tổng chi phí' });
-      results.push({ month: monthStr, value: totalSalaries, category: 'Tổng lương' });
-      results.push({ month: monthStr, value: netRevenue, category: 'Doanh thu' });
+      grandTotalFees += totalFees;
+      grandTotalSalaries += monthlyTotalSalaries;
+
+      results.push({ month: monthStr, value: totalFees, category: 'Tổng Doanh Thu' });
+      results.push({ month: monthStr, value: monthlyTotalSalaries, category: 'Chi phí vận hành' });
+      results.push({ month: monthStr, value: netRevenue, category: 'Lợi nhuận' });
 
       currentMonth = currentMonth.add(1, 'month');
     }
+    
+    setPeriodTotals({
+      fees: grandTotalFees,
+      salaries: grandTotalSalaries,
+      profit: grandTotalFees - grandTotalSalaries,
+    });
     setChartData(results);
     setLoading(false);
   };
@@ -103,13 +120,41 @@ const ReportsPage = () => {
     xField: 'month',
     yField: 'value',
     seriesField: 'category',
+    color: ({ category }: any) => {
+      if (category === 'Tổng Doanh Thu') return '#FFC107';
+      if (category === 'Chi phí vận hành') return '#F44336';
+      if (category === 'Lợi nhuận') return '#4CAF50';
+      return '#1890ff';
+    },
     yAxis: {
       label: {
-        formatter: (v: any) => `${v / 1000000}M VND`,
+        formatter: (v: any) => `${(v / 1000000).toFixed(2)}M`,
       },
     },
     tooltip: {
-      formatter: (datum: any) => ({ name: datum.category, value: `${datum.value.toLocaleString()} VND` }),
+      customContent: (title: string, items: any[]) => {
+        if (!items || items.length === 0) return `<div></div>`;
+        let listItems = items.map((item: any) => {
+          // Truy cập đúng vào item.data thay vì item trực tiếp
+          const actualValue = item.data?.value || item.value || 0;
+          const categoryName = item.data?.category || item.name || '';
+          const itemColor = item.color || '#1890ff';
+          
+          const value = (typeof actualValue === 'number' && !isNaN(actualValue))
+            ? actualValue.toLocaleString('vi-VN')
+            : '0';
+          
+          return `<li style="list-style: none; margin: 8px 0; display: flex; align-items: center;">
+            <span style="background-color:${itemColor}; width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px;"></span>
+            <span>${categoryName}:</span>
+            <span style="margin-left: auto; font-weight: bold;">${value} VND</span>
+          </li>`;
+        }).join('');
+        return `<div style="padding: 12px; border-radius: 4px; background-color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+          <h4 style="margin: 0 0 12px 0;">${title}</h4>
+          <ul style="padding: 0; margin: 0;">${listItems}</ul>
+        </div>`;
+      },
     },
     legend: { position: 'top' as const },
     smooth: true,
@@ -117,6 +162,47 @@ const ReportsPage = () => {
 
   return (
     <Row gutter={[16, 16]}>
+      <Col span={24}>
+        <Card title="Báo cáo doanh thu chi tiết">
+          <Form onFinish={onRevenueFinish} layout="inline" style={{ marginBottom: 24 }}>
+            <Form.Item name="startMonth" label="Từ tháng" rules={[{ required: true }]}>
+              <DatePicker.MonthPicker 
+                onChange={(date) => setStartMonth(date)}
+                disabledDate={(current) => 
+                  (establishmentDate && current.isBefore(establishmentDate, 'month')) || current.isAfter(dayjs(), 'month')
+                }
+              />
+            </Form.Item>
+            <Form.Item name="endMonth" label="Đến tháng" rules={[{ required: true }]}>
+              <DatePicker.MonthPicker 
+                disabled={!startMonth}
+                disabledDate={(current) => 
+                  startMonth ? current.isBefore(startMonth, 'month') || current.isAfter(startMonth.add(11, 'month'), 'month') : false
+                }
+              />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" loading={loading}>Xem báo cáo</Button>
+            </Form.Item>
+          </Form>
+
+          <Row gutter={16} style={{ marginBottom: 24 }}>
+            <Col span={8}>
+              <Statistic title="Tổng Doanh Thu" value={periodTotals.fees || 0} precision={0} suffix="VND" />
+            </Col>
+            <Col span={8}>
+              <Statistic title="Chi phí vận hành" value={periodTotals.salaries || 0} precision={0} suffix="VND" />
+            </Col>
+            <Col span={8}>
+              <Statistic title="Lợi nhuận" value={periodTotals.profit || 0} precision={0} suffix="VND" />
+            </Col>
+          </Row>
+
+          {chartData.length > 0 && (
+            <Line {...chartConfig} />
+          )}
+        </Card>
+      </Col>
       <Col span={24}>
         <Card title="Thống kê số lượng bệnh nhân khám bệnh">
           <Form onFinish={onAppointmentCountFinish} layout="inline">
@@ -136,30 +222,6 @@ const ReportsPage = () => {
             </Form.Item>
           </Form>
           <Statistic title="Số lượng bệnh nhân" value={appointmentCount} style={{ marginTop: 16 }} />
-        </Card>
-      </Col>
-      <Col span={24}>
-        <Card title="Báo cáo doanh thu chi tiết">
-          <Form onFinish={onRevenueFinish} layout="inline" style={{ marginBottom: 24 }}>
-            <Form.Item name="startMonth" label="Từ tháng" rules={[{ required: true }]}>
-              <DatePicker.MonthPicker 
-                onChange={(date) => setStartMonth(date)}
-                disabledDate={(current) => establishmentDate ? current.isBefore(establishmentDate, 'month') : false}
-              />
-            </Form.Item>
-            <Form.Item name="endMonth" label="Đến tháng" rules={[{ required: true }]}>
-              <DatePicker.MonthPicker 
-                disabled={!startMonth}
-                disabledDate={(current) => 
-                  startMonth ? current.isBefore(startMonth, 'month') || current.isAfter(startMonth.add(11, 'month'), 'month') : false
-                }
-              />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit" loading={loading}>Xem báo cáo</Button>
-            </Form.Item>
-          </Form>
-          {chartData.length > 0 && <Line {...chartConfig} />}
         </Card>
       </Col>
       <Col span={24}>
