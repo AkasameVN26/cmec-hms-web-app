@@ -3,15 +3,26 @@
 import { useState, useEffect } from 'react';
 import { Card, Table, DatePicker, Button, Form, Row, Col, Statistic } from 'antd';
 import { supabase } from '@/lib/supabase';
+import { Line } from '@ant-design/charts';
+import dayjs, { Dayjs } from 'dayjs';
 
 const ReportsPage = () => {
   const [appointmentCount, setAppointmentCount] = useState(0);
   const [inpatients, setInpatients] = useState<any[]>([]);
-  const [revenue, setRevenue] = useState({ totalFees: 0, totalSalaries: 0, netRevenue: 0 });
+  const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [establishmentDate, setEstablishmentDate] = useState<Dayjs | null>(null);
+  const [startMonth, setStartMonth] = useState<Dayjs | null>(null);
 
   useEffect(() => {
     fetchInpatients();
+    const fetchHospitalInfo = async () => {
+      const { data, error } = await supabase.from('benh_vien').select('ngay_thanh_lap').single();
+      if (data && data.ngay_thanh_lap) {
+        setEstablishmentDate(dayjs(data.ngay_thanh_lap));
+      }
+    };
+    fetchHospitalInfo();
   }, []);
 
   const fetchInpatients = async () => {
@@ -41,29 +52,43 @@ const ReportsPage = () => {
   };
 
   const onRevenueFinish = async (values: any) => {
-    if (!values.month) return;
+    const { startMonth, endMonth } = values;
+    if (!startMonth || !endMonth) return;
 
-    const year = values.month.year();
-    const month = values.month.month();
-    const startDate = new Date(year, month, 1).toISOString();
-    const endDate = new Date(year, month + 1, 0).toISOString();
-
-    const { data: feesData, error: feesError } = await supabase
-      .from('lich_kham')
-      .select('chi_phi_kham')
-      .gte('thoi_gian_kham', startDate)
-      .lte('thoi_gian_kham', endDate)
-      .eq('trang_thai', 'Đã Khám');
+    setLoading(true);
+    const results = [];
+    let currentMonth = startMonth.clone();
 
     const { data: salariesData, error: salariesError } = await supabase
       .from('bac_si')
       .select('tien_luong');
-
-    const totalFees = feesData ? feesData.reduce((acc, item) => acc + (item.chi_phi_kham || 0), 0) : 0;
     const totalSalaries = salariesData ? salariesData.reduce((acc, item) => acc + (item.tien_luong || 0), 0) : 0;
-    const netRevenue = totalFees - totalSalaries;
 
-    setRevenue({ totalFees, totalSalaries, netRevenue });
+    while (currentMonth.isBefore(endMonth) || currentMonth.isSame(endMonth, 'month')) {
+      const year = currentMonth.year();
+      const month = currentMonth.month();
+      const startDate = new Date(year, month, 1).toISOString();
+      const endDate = new Date(year, month + 1, 0).toISOString();
+
+      const { data: feesData, error: feesError } = await supabase
+        .from('lich_kham')
+        .select('chi_phi_kham')
+        .gte('thoi_gian_kham', startDate)
+        .lte('thoi_gian_kham', endDate)
+        .eq('trang_thai', 'Đã Khám');
+
+      const totalFees = feesData ? feesData.reduce((acc, item) => acc + (item.chi_phi_kham || 0), 0) : 0;
+      const netRevenue = totalFees - totalSalaries;
+      const monthStr = currentMonth.format('YYYY-MM');
+
+      results.push({ month: monthStr, value: totalFees, category: 'Tổng chi phí' });
+      results.push({ month: monthStr, value: totalSalaries, category: 'Tổng lương' });
+      results.push({ month: monthStr, value: netRevenue, category: 'Doanh thu' });
+
+      currentMonth = currentMonth.add(1, 'month');
+    }
+    setChartData(results);
+    setLoading(false);
   };
 
   const inpatientColumns = [
@@ -72,6 +97,23 @@ const ReportsPage = () => {
     { title: 'Lý do khám', dataIndex: 'ly_do_kham', key: 'ly_do_kham' },
     { title: 'Kết luận', dataIndex: 'ket_luan_benh', key: 'ket_luan_benh' },
   ];
+
+  const chartConfig = {
+    data: chartData,
+    xField: 'month',
+    yField: 'value',
+    seriesField: 'category',
+    yAxis: {
+      label: {
+        formatter: (v: any) => `${v / 1000000}M VND`,
+      },
+    },
+    tooltip: {
+      formatter: (datum: any) => ({ name: datum.category, value: `${datum.value.toLocaleString()} VND` }),
+    },
+    legend: { position: 'top' as const },
+    smooth: true,
+  };
 
   return (
     <Row gutter={[16, 16]}>
@@ -97,26 +139,27 @@ const ReportsPage = () => {
         </Card>
       </Col>
       <Col span={24}>
-        <Card title="Thống kê doanh thu">
-          <Form onFinish={onRevenueFinish} layout="inline">
-            <Form.Item name="month" label="Chọn tháng">
-              <DatePicker.MonthPicker />
+        <Card title="Báo cáo doanh thu chi tiết">
+          <Form onFinish={onRevenueFinish} layout="inline" style={{ marginBottom: 24 }}>
+            <Form.Item name="startMonth" label="Từ tháng" rules={[{ required: true }]}>
+              <DatePicker.MonthPicker 
+                onChange={(date) => setStartMonth(date)}
+                disabledDate={(current) => establishmentDate ? current.isBefore(establishmentDate, 'month') : false}
+              />
+            </Form.Item>
+            <Form.Item name="endMonth" label="Đến tháng" rules={[{ required: true }]}>
+              <DatePicker.MonthPicker 
+                disabled={!startMonth}
+                disabledDate={(current) => 
+                  startMonth ? current.isBefore(startMonth, 'month') || current.isAfter(startMonth.add(11, 'month'), 'month') : false
+                }
+              />
             </Form.Item>
             <Form.Item>
-              <Button htmlType="submit">Xem</Button>
+              <Button type="primary" htmlType="submit" loading={loading}>Xem báo cáo</Button>
             </Form.Item>
           </Form>
-          <Row gutter={16} style={{ marginTop: 16 }}>
-            <Col span={8}>
-              <Statistic title="Tổng chi phí khám" value={revenue.totalFees} precision={0} suffix="VND" />
-            </Col>
-            <Col span={8}>
-              <Statistic title="Tổng lương bác sĩ" value={revenue.totalSalaries} precision={0} suffix="VND" />
-            </Col>
-            <Col span={8}>
-              <Statistic title="Doanh thu" value={revenue.netRevenue} precision={0} suffix="VND" />
-            </Col>
-          </Row>
+          {chartData.length > 0 && <Line {...chartConfig} />}
         </Card>
       </Col>
       <Col span={24}>
