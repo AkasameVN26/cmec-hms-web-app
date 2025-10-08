@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import dynamic from 'next/dynamic';
 import dayjs, { Dayjs } from 'dayjs';
 
-const Line = dynamic(() => import('@ant-design/charts').then((mod) => mod.Line), { ssr: false });
+const ReactECharts = dynamic(() => import('echarts-for-react').then((mod) => mod.default), { ssr: false });
 
 const ReportsPage = () => {
   const [appointmentCount, setAppointmentCount] = useState(0);
@@ -115,49 +115,69 @@ const ReportsPage = () => {
     { title: 'Kết luận', dataIndex: 'ket_luan_benh', key: 'ket_luan_benh' },
   ];
 
-  const chartConfig = {
-    data: chartData,
-    xField: 'month',
-    yField: 'value',
-    seriesField: 'category',
-    color: ({ category }: any) => {
-      if (category === 'Tổng Doanh Thu') return '#FFC107';
-      if (category === 'Chi phí vận hành') return '#F44336';
-      if (category === 'Lợi nhuận') return '#4CAF50';
-      return '#1890ff';
-    },
-    yAxis: {
-      label: {
-        formatter: (v: any) => `${(v / 1000000).toFixed(2)}M`,
+  const getChartOptions = (data: any[]) => {
+    if (!data || data.length === 0) return {};
+
+    const months = [...new Set(data.map(item => item.month))].sort();
+    const categories = ['Tổng Doanh Thu', 'Chi phí vận hành', 'Lợi nhuận'];
+    const colors = ['#FFC107', '#F44336', '#4CAF50'];
+
+    const series = categories.map(category => ({
+      name: category,
+      type: 'line',
+      smooth: true,
+      data: months.map(month => {
+        const item = data.find(d => d.month === month && d.category === category);
+        return item ? item.value : 0;
+      }),
+    }));
+
+    return {
+      color: colors,
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params: any[]) => {
+          if (!params || params.length === 0) return '';
+          let tooltipHtml = `<div style="padding: 12px; border-radius: 4px; background-color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+            <h4 style="margin: 0 0 12px 0;">${params[0].axisValueLabel}</h4>
+            <ul style="padding: 0; margin: 0;">`;
+          params.forEach(param => {
+            const value = (typeof param.value === 'number' && !isNaN(param.value))
+              ? param.value.toLocaleString('vi-VN')
+              : '0';
+            tooltipHtml += `<li style="list-style: none; margin: 8px 0; display: flex; align-items: center;">
+              <span style="background-color:${param.color}; width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px;"></span>
+              <span>${param.seriesName}:</span>
+              <span style="margin-left: auto; font-weight: bold;">${value} VND</span>
+            </li>`;
+          });
+          tooltipHtml += `</ul></div>`;
+          return tooltipHtml;
+        }
       },
-    },
-    tooltip: {
-      customContent: (title: string, items: any[]) => {
-        if (!items || items.length === 0) return `<div></div>`;
-        let listItems = items.map((item: any) => {
-          // Truy cập đúng vào item.data thay vì item trực tiếp
-          const actualValue = item.data?.value || item.value || 0;
-          const categoryName = item.data?.category || item.name || '';
-          const itemColor = item.color || '#1890ff';
-          
-          const value = (typeof actualValue === 'number' && !isNaN(actualValue))
-            ? actualValue.toLocaleString('vi-VN')
-            : '0';
-          
-          return `<li style="list-style: none; margin: 8px 0; display: flex; align-items: center;">
-            <span style="background-color:${itemColor}; width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px;"></span>
-            <span>${categoryName}:</span>
-            <span style="margin-left: auto; font-weight: bold;">${value} VND</span>
-          </li>`;
-        }).join('');
-        return `<div style="padding: 12px; border-radius: 4px; background-color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
-          <h4 style="margin: 0 0 12px 0;">${title}</h4>
-          <ul style="padding: 0; margin: 0;">${listItems}</ul>
-        </div>`;
+      legend: {
+        data: categories,
+        top: 'top',
       },
-    },
-    legend: { position: 'top' as const },
-    smooth: true,
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: months,
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: {
+          formatter: (value: number) => `${(value / 1000000).toFixed(2)}M`
+        }
+      },
+      series: series,
+    };
   };
 
   return (
@@ -199,7 +219,7 @@ const ReportsPage = () => {
           </Row>
 
           {chartData.length > 0 && (
-            <Line {...chartConfig} />
+            <ReactECharts option={getChartOptions(chartData)} style={{ height: 400 }} />
           )}
         </Card>
       </Col>

@@ -12,6 +12,7 @@ const { Text } = Typography;
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [collapsed, setCollapsed] = useState(true);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -59,8 +60,17 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
         </Button>
       </Header>
       <Layout>
-        <Sider width={250} theme="dark">
-          <Navbar />
+        <Sider 
+          theme="dark"
+          collapsible
+          collapsed={collapsed}
+          trigger={null} // We use mouse events to trigger, so no need for the default trigger
+          onMouseEnter={() => setCollapsed(false)}
+          onMouseLeave={() => setCollapsed(true)}
+          width={250}
+          collapsedWidth={80}
+        >
+          <Navbar collapsed={collapsed} />
         </Sider>
         <Layout style={{ padding: "0 24px 24px" }}>
           <Content

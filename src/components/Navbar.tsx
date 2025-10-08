@@ -12,7 +12,7 @@ import {
 } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 
-const Navbar = () => {
+const Navbar = ({ collapsed }: { collapsed: boolean }) => {
   const router = useRouter();
 
   const menuItems = [
@@ -26,13 +26,21 @@ const Navbar = () => {
   ];
 
   return (
-    <Menu
-      theme="dark"
-      mode="inline"
-      defaultSelectedKeys={['/dashboard']}
-      onClick={({ key }) => router.push(key)}
-      items={menuItems}
-    />
+    <>
+      <div style={{ height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255, 255, 255, 0.05)' }}>
+        <h1 style={{ color: 'white', margin: 0, fontSize: '24px', fontWeight: 'bold', transition: 'opacity 0.3s' }}>
+          {collapsed ? 'C' : 'CMEC'}
+        </h1>
+      </div>
+      <Menu
+        theme="dark"
+        mode="inline"
+        defaultSelectedKeys={['/dashboard']}
+        onClick={({ key }) => router.push(key)}
+        items={menuItems}
+        inlineCollapsed={collapsed}
+      />
+    </>
   );
 };
 
