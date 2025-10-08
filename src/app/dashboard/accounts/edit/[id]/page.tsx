@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, Form, Button, Select, message } from 'antd';
+import { Card, Form, Button, Input, message, Typography } from 'antd';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
-const { Option } = Select;
+const { Text } = Typography;
 
 const EditAccountPage = ({ params }: { params: { id: string } }) => {
   const [account, setAccount] = useState<any>(null);
@@ -36,15 +36,19 @@ const EditAccountPage = ({ params }: { params: { id: string } }) => {
 
   const onFinish = async (values: any) => {
     setLoading(true);
-    const { error } = await supabase
-      .from('tai_khoan')
-      .update({ vai_tro: values.vai_tro })
-      .eq('id', params.id);
+    
+    // Calling an edge function to update the user's email securely
+    const { error } = await supabase.functions.invoke('update-user-email', {
+      body: {
+        user_id: params.id,
+        new_email: values.email,
+      },
+    });
 
     if (error) {
-      message.error(error.message);
+      message.error(`Lỗi khi cập nhật email: ${error.message}`);
     } else {
-      message.success('Cập nhật tài khoản thành công');
+      message.success('Cập nhật email thành công. Người dùng sẽ cần xác minh email mới.');
       router.push('/dashboard/accounts');
     }
     setLoading(false);
@@ -62,24 +66,24 @@ const EditAccountPage = ({ params }: { params: { id: string } }) => {
           <Form.Item
             label="Email"
             name="email"
+            rules={[
+              { required: true, message: 'Vui lòng nhập email' },
+              { type: 'email', message: 'Email không hợp lệ' },
+            ]}
           >
-            <p>{account.email}</p>
+            <Input />
           </Form.Item>
 
           <Form.Item
             label="Vai trò"
             name="vai_tro"
-            rules={[{ required: true, message: 'Vui lòng chọn vai trò' }]}
           >
-            <Select placeholder="Chọn vai trò">
-              <Option value="Quản lý">Quản lý</Option>
-              <Option value="Bác sĩ">Bác sĩ</Option>
-            </Select>
+            <Text strong>{account.vai_tro}</Text>
           </Form.Item>
 
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={loading}>
-              Lưu
+              Lưu thay đổi
             </Button>
           </Form.Item>
         </Form>

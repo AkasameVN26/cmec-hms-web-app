@@ -23,7 +23,7 @@ const AppointmentsPage = () => {
 
   useEffect(() => {
     const fetchDoctors = async () => {
-      const { data, error } = await supabase.from('bac_si').select('id_bac_si, ho_ten');
+      const { data, error } = await supabase.from('bac_si').select('id_bac_si, ho_ten, chuyen_khoa');
       if (data) setDoctors(data);
     };
     fetchDoctors();
@@ -205,7 +205,7 @@ const AppointmentsPage = () => {
               <Form.Item name="id_bac_si" label="Tra cứu theo bác sĩ">
                 <Select placeholder="Chọn bác sĩ" allowClear>
                   {doctors.map(doctor => (
-                    <Option key={doctor.id_bac_si} value={doctor.id_bac_si}>{doctor.ho_ten}</Option>
+                    <Option key={doctor.id_bac_si} value={doctor.id_bac_si}>{`${doctor.ho_ten} (${doctor.chuyen_khoa})`}</Option>
                   ))}
                 </Select>
               </Form.Item>

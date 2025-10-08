@@ -33,7 +33,7 @@ const DoctorsPage = () => {
   const fetchData = async () => {
     setLoading(true);
     const { data: doctorsData } = await supabase.from('bac_si').select('*');
-    const { data: shiftsData } = await supabase.from('lich_truc').select('*');
+    const { data: shiftsData } = await supabase.from('lich_truc').select('*').gte('ngay_truc', new Date().toISOString());
     if (doctorsData) setDoctors(doctorsData);
     if (shiftsData) setShifts(shiftsData);
     setLoading(false);
@@ -46,7 +46,8 @@ const DoctorsPage = () => {
       .from('lich_truc')
       .select('*')
       .eq('id_bac_si', doctor.id_bac_si)
-      .order('ngay_truc', { ascending: false });
+      .gte('ngay_truc', new Date().toISOString())
+      .order('ngay_truc', { ascending: true });
     if (data) setDoctorShifts(data);
     setIsShiftsModalVisible(true);
     setLoading(false);
@@ -83,10 +84,10 @@ const DoctorsPage = () => {
       message.success('Thêm lịch trực thành công');
       shiftForm.resetFields();
       // Refresh shifts in modal
-      const { data } = await supabase.from('lich_truc').select('*').eq('id_bac_si', selectedDoctor.id_bac_si).order('ngay_truc', { ascending: false });
+      const { data } = await supabase.from('lich_truc').select('*').eq('id_bac_si', selectedDoctor.id_bac_si).gte('ngay_truc', new Date().toISOString()).order('ngay_truc', { ascending: true });
       if (data) setDoctorShifts(data);
       // Refresh shifts in main table
-      const { data: shiftsData } = await supabase.from('lich_truc').select('*');
+      const { data: shiftsData } = await supabase.from('lich_truc').select('*').gte('ngay_truc', new Date().toISOString());
       if (shiftsData) setShifts(shiftsData);
     }
   };
@@ -98,10 +99,10 @@ const DoctorsPage = () => {
     } else {
       message.success('Xoá lịch trực thành công');
       // Refresh shifts in modal
-      const { data } = await supabase.from('lich_truc').select('*').eq('id_bac_si', selectedDoctor.id_bac_si).order('ngay_truc', { ascending: false });
+      const { data } = await supabase.from('lich_truc').select('*').eq('id_bac_si', selectedDoctor.id_bac_si).gte('ngay_truc', new Date().toISOString()).order('ngay_truc', { ascending: true });
       if (data) setDoctorShifts(data);
       // Refresh shifts in main table
-      const { data: shiftsData } = await supabase.from('lich_truc').select('*');
+      const { data: shiftsData } = await supabase.from('lich_truc').select('*').gte('ngay_truc', new Date().toISOString());
       if (shiftsData) setShifts(shiftsData);
     }
   };
@@ -207,7 +208,7 @@ const DoctorsPage = () => {
           <List
             header={<div>Lịch trực sắp tới</div>}
             bordered
-            dataSource={doctorShifts.filter(shift => !dayjs(shift.ngay_truc).isBefore(dayjs().startOf('day')))}
+            dataSource={doctorShifts}
             loading={loading}
             renderItem={item => (
               <List.Item
