@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import AntdProvider from "@/providers/AntdRegistry";
+import { AuthProvider } from "@/providers/AuthProvider";
+import { TopProgressBar } from "@/components/TopProgressBar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,7 +20,10 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className={inter.className}>
-        <AntdProvider>{children}</AntdProvider>
+        <TopProgressBar />
+        <AuthProvider>
+          <AntdProvider>{children}</AntdProvider>
+        </AuthProvider>
       </body>
     </html>
   );

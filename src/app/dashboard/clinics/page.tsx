@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, Table, Button, Modal, Form, Input, message, Space } from 'antd';
+import { Card, Table, Button, Modal, Form, Input, message, Space, InputNumber } from 'antd';
 import { supabase } from '@/lib/supabase';
 
 const ClinicsPage = () => {
@@ -81,6 +81,12 @@ const ClinicsPage = () => {
     { title: 'Tên phòng khám', dataIndex: 'ten_phong_kham', key: 'ten_phong_kham' },
     { title: 'Vị trí', dataIndex: 'vi_tri', key: 'vi_tri' },
     {
+        title: 'Chi phí vận hành (VND/tháng)',
+        dataIndex: 'chi_phi_van_hanh',
+        key: 'chi_phi_van_hanh',
+        render: (cost: number) => cost ? cost.toLocaleString() : 'N/A'
+    },
+    {
       title: 'Hành động',
       key: 'action',
       render: (_: any, record: any) => (
@@ -115,6 +121,9 @@ const ClinicsPage = () => {
           </Form.Item>
           <Form.Item name="vi_tri" label="Vị trí" rules={[{ required: true }]}>
             <Input />
+          </Form.Item>
+          <Form.Item name="chi_phi_van_hanh" label="Chi phí vận hành (VND/tháng)" rules={[{ required: true }]}>
+            <InputNumber style={{ width: '100%' }} min={0} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')} parser={(value) => value ? parseInt(value.replace(/\./g, '')) : 0} />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit">
