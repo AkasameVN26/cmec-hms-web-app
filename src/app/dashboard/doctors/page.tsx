@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, Table, Button, Space, Modal, Descriptions, Spin, Form, DatePicker, Select, List, message, Typography, Row, Col, Tag, Input } from 'antd';
+import { Card, Table, Button, Space, Modal, Descriptions, Spin, Form, DatePicker, Select, List, message, Typography, Row, Col, Tag, Input, InputNumber } from 'antd';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import NProgress from 'nprogress';
@@ -69,6 +69,22 @@ const DoctorsPage = () => {
     setLoading(false);
   };
 
+  const handleViewDetails = async (doctor: any) => {
+    setLoading(true);
+    const { count } = await supabase
+      .from('lich_kham')
+      .select('*', { count: 'exact', head: true })
+      .eq('id_bac_si', doctor.id_bac_si);
+    setSelectedDoctorDetails({ ...doctor, appointment_count: count || 0 });
+    setIsDetailsModalVisible(true);
+    setLoading(false);
+  };
+
+  const handleEditInfo = (doctorId: string) => {
+    NProgress.start();
+    router.push(`/dashboard/doctors/edit/${doctorId}`);
+  };
+
   const handleSearch = (values: any) => {
     let filtered = doctors;
 
@@ -93,98 +109,25 @@ const DoctorsPage = () => {
     setFilteredDoctors(doctors);
   };
 
-  const handleManageShifts = async (doctor: any) => {
-    setLoading(true);
-    setSelectedDoctor(doctor);
-    const { data } = await supabase
-      .from('lich_truc')
-      .select('*')
-      .eq('id_bac_si', doctor.id_bac_si)
-      .gte('ngay_truc', new Date().toISOString())
-      .order('ngay_truc', { ascending: true });
-    if (data) setDoctorShifts(data);
-    setIsShiftsModalVisible(true);
-    setLoading(false);
-  };
 
-  const handleViewDetails = async (doctor: any) => {
-    setLoading(true);
-    const { count } = await supabase
-      .from('lich_kham')
-      .select('*', { count: 'exact', head: true })
-      .eq('id_bac_si', doctor.id_bac_si);
-    setSelectedDoctorDetails({ ...doctor, appointment_count: count || 0 });
-    setIsDetailsModalVisible(true);
-    setLoading(false);
-  };
-
-  const handleEditInfo = (doctorId: string) => {
-    NProgress.start();
-    router.push(`/dashboard/doctors/edit/${doctorId}`);
-  };
-
-  const handleAddShift = async (values: any) => {
-    if (!selectedDoctor) return;
-    const { error } = await supabase.from('lich_truc').insert([
-      {
-        id_bac_si: selectedDoctor.id_bac_si,
-        ngay_truc: values.ngay_truc.format('YYYY-MM-DD'),
-        ca_truc: values.ca_truc,
-      },
-    ]);
-
-    if (error) {
-      message.error(error.message);
-    } else {
-      message.success('Thêm lịch trực thành công');
-      shiftForm.resetFields();
-      const { data } = await supabase.from('lich_truc').select('*').eq('id_bac_si', selectedDoctor.id_bac_si).gte('ngay_truc', new Date().toISOString()).order('ngay_truc', { ascending: true });
-      if (data) setDoctorShifts(data);
-      const { data: shiftsData } = await supabase.from('lich_truc').select('*').gte('ngay_truc', new Date().toISOString());
-      if (shiftsData) setShifts(shiftsData);
-    }
-  };
-
-  const handleDeleteShift = async (shiftId: number) => {
-    const { error } = await supabase.from('lich_truc').delete().eq('id_lich_truc', shiftId);
-    if (error) {
-      message.error(error.message);
-    } else {
-      message.success('Xoá lịch trực thành công');
-      const { data } = await supabase.from('lich_truc').select('*').eq('id_bac_si', selectedDoctor.id_bac_si).gte('ngay_truc', new Date().toISOString()).order('ngay_truc', { ascending: true });
-      if (data) setDoctorShifts(data);
-      const { data: shiftsData } = await supabase.from('lich_truc').select('*').gte('ngay_truc', new Date().toISOString());
-      if (shiftsData) setShifts(shiftsData);
-    }
-  };
 
   const columns = [
     { title: 'Họ tên', dataIndex: ['tai_khoan', 'ho_ten'], key: 'ho_ten', render: (text:string) => text || '-' },
-    { title: 'Email', dataIndex: ['tai_khoan', 'email'], key: 'email', render: (text:string) => text || '-' },
-    { title: 'Chuyên khoa', dataIndex: ['chuyen_khoa', 'ten_chuyen_khoa'], key: 'ten_chuyen_khoa', render: (text:string) => text || '-' },
-    {
-      title: 'Lịch trực',
-      key: 'lich_truc',
-      render: (_: any, record: any) => {
-        const doctorShifts = shifts.filter(shift => shift.id_bac_si === record.id_bac_si);
-        if (doctorShifts.length === 0) return '-';
-        return (
-          <>
-            {doctorShifts.map(shift => (
-              <Tag key={shift.id_lich_truc} style={{ margin: '2px' }}>
-                {`Ca ${shift.ca_truc} - ${new Date(shift.ngay_truc).toLocaleDateString()}`}
-              </Tag>
-            ))}
-          </>
-        );
-      },
+    { 
+        title: 'Email', 
+        dataIndex: ['tai_khoan', 'email'], 
+        key: 'email', 
+        width: 250,
+        render: (text:string) => text ? <Typography.Text style={{ maxWidth: 250 }} ellipsis={{ tooltip: text }}>{text}</Typography.Text> : '-' 
     },
+    { title: 'Chuyên khoa', dataIndex: ['chuyen_khoa', 'ten_chuyen_khoa'], key: 'ten_chuyen_khoa', width: 200, render: (text:string) => text || '-' },
     {
       title: 'Hành động',
       key: 'action',
+      width: 280,
       render: (_: any, record: any) => (
         <Space size="middle">
-          <Button onClick={() => handleManageShifts(record)}>Quản lý lịch trực</Button>
+          <Button onClick={() => router.push(`/dashboard/schedules?doctor_id=${record.id_bac_si}`)}>Lịch trực</Button>
           <Button onClick={() => handleViewDetails(record)}>Xem chi tiết</Button>
           <Button onClick={() => handleEditInfo(record.id_bac_si)}>Sửa thông tin</Button>
         </Space>
@@ -259,52 +202,7 @@ const DoctorsPage = () => {
         </Modal>
       )}
 
-      {selectedDoctor && (
-        <Modal
-          title={`Quản lý lịch trực cho Bác sĩ ${selectedDoctor.tai_khoan?.ho_ten}`}
-          visible={isShiftsModalVisible}
-          onCancel={() => setIsShiftsModalVisible(false)}
-          footer={<Button onClick={() => setIsShiftsModalVisible(false)}>Đóng</Button>}
-          width={600}
-        >
-          <Form form={shiftForm} layout="vertical" onFinish={handleAddShift} style={{ marginBottom: 24 }}>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item name="ngay_truc" label="Ngày trực" rules={[{ required: true, message: 'Vui lòng chọn ngày'}]}>
-                  <DatePicker placeholder="Chọn ngày trực" disabledDate={disabledDate} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item name="ca_truc" label="Ca trực" rules={[{ required: true, message: 'Vui lòng chọn ca'}]}>
-                  <Select placeholder="Chọn ca">
-                    <Option value="Sáng">Sáng</Option>
-                    <Option value="Chiều">Chiều</Option>
-                    <Option value="Tối">Tối</Option>
-                  </Select>
-                </Form.Item>
-                <Typography.Text type="secondary">(Sáng: 7-12h, Chiều: 13-17h, Tối: 18-21h)</Typography.Text>
-              </Col>
-            </Row>
-            <Form.Item>
-              <Button type="primary" htmlType="submit">Thêm</Button>
-            </Form.Item>
-          </Form>
-          <List
-            header={<div>Lịch trực sắp tới</div>}
-            bordered
-            dataSource={doctorShifts}
-            loading={loading}
-            renderItem={item => (
-              <List.Item
-                key={item.id_lich_truc}
-                actions={[<Button danger size="small" onClick={() => handleDeleteShift(item.id_lich_truc)}>Xoá</Button>]}
-              >
-                {`Ngày ${new Date(item.ngay_truc).toLocaleDateString()} - Ca ${item.ca_truc}`}
-              </List.Item>
-            )}
-          />
-        </Modal>
-      )}
+
     </>
   );
 };

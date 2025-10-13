@@ -37,47 +37,60 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(currentUser ?? null);
 
       if (currentUser) {
-        // Fetch profile, roles, and permissions in one go
-        const { data: profileData, error } = await supabase
+        // Step 1: Fetch basic profile
+        const { data: profileData, error: profileError } = await supabase
           .from('tai_khoan')
-          .select(`
-            *,
-            user_roles (
-              roles (
-                ten_vai_tro,
-                role_permissions (
-                  permissions ( ten_quyen )
-                )
-              )
-            )
-          `)
+          .select('*')
           .eq('id', currentUser.id)
           .single();
 
-        if (profileData) {
-          setProfile(profileData);
+        if (profileError || !profileData) {
+          console.error("AuthProvider Error: Could not fetch user profile.", profileError);
+          setLoading(false);
+          return;
+        }
+        setProfile(profileData);
 
-          const userRoles: string[] = [];
-          const userPermissions = new Set<string>();
+        // Step 2: Fetch role IDs from user_roles
+        const { data: userRolesData, error: userRolesError } = await supabase
+          .from('user_roles')
+          .select('id_vai_tro')
+          .eq('id_tai_khoan', currentUser.id);
 
-          profileData.user_roles.forEach((userRole: any) => {
-            const role = userRole.roles;
-            if (role) {
+        if (userRolesError) {
+          console.error("AuthProvider Error: Could not fetch user role links.", userRolesError);
+          setLoading(false);
+          return;
+        }
+        const roleIds = userRolesData.map(r => r.id_vai_tro);
+
+        if (roleIds.length > 0) {
+          // Step 3: Fetch roles and their permissions
+          const { data: rolesData, error: rolesError } = await supabase
+            .from('roles')
+            .select('ten_vai_tro, role_permissions(permissions(ten_quyen))')
+            .in('id', roleIds);
+
+          if (rolesError) {
+            console.error("AuthProvider Error: Could not fetch roles and permissions.", rolesError);
+          } else if (rolesData) {
+            const userRoles: string[] = [];
+            const userPermissions = new Set<string>();
+
+            rolesData.forEach((role: any) => {
               userRoles.push(role.ten_vai_tro);
-              // Add system.admin permission if the role is Quản lý
               if (role.ten_vai_tro === 'Quản lý') {
-                  userPermissions.add('system.admin');
+                userPermissions.add('system.admin');
               }
               role.role_permissions.forEach((rp: any) => {
                 if (rp.permissions) {
                   userPermissions.add(rp.permissions.ten_quyen);
                 }
               });
-            }
-          });
-
-          setRoles(userRoles);
-          setPermissions(userPermissions);
+            });
+            setRoles(userRoles);
+            setPermissions(userPermissions);
+          }
         }
       }
       setLoading(false);

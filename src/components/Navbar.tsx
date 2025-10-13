@@ -14,7 +14,7 @@ import {
   ApartmentOutlined,
   UnorderedListOutlined,
 } from "@ant-design/icons";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
 import NProgress from "nprogress";
 
@@ -22,6 +22,7 @@ const { SubMenu } = Menu;
 
 const Navbar = ({ collapsed }: { collapsed: boolean }) => {
   const router = useRouter();
+  const pathname = usePathname(); // Get current path
   const { can } = useAuth();
 
   const handleNavigation = (key: string) => {
@@ -55,7 +56,7 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
       <Menu
         theme="dark"
         mode="inline"
-        defaultSelectedKeys={["/dashboard"]}
+        selectedKeys={[pathname]} // Use selectedKeys with current path
         onClick={({ key }) => handleNavigation(key)}
         inlineCollapsed={collapsed}
       >
@@ -90,14 +91,11 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
           icon={<ExperimentOutlined />}
           title="Cận lâm sàng (CLS)"
         >
-          <Menu.Item key="/dashboard/clinical-services/services">
-            Dịch vụ CLS
-          </Menu.Item>
           <Menu.Item key="/dashboard/clinical-services/requests">
-            Chỉ định CLS
+            Chỉ định đang chờ
           </Menu.Item>
           <Menu.Item key="/dashboard/clinical-services/results">
-            Kết quả CLS
+            Danh sách kết quả
           </Menu.Item>
         </SubMenu>
 
@@ -119,6 +117,7 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
           <Menu.Item key="/dashboard/technicians">
             Quản lý Kỹ thuật viên
           </Menu.Item>
+          <Menu.Item key="/dashboard/schedules">Quản lý Lịch trực</Menu.Item>
           <Menu.Item key="/dashboard/accounts">Quản lý Tài khoản</Menu.Item>
         </SubMenu>
 
@@ -128,11 +127,6 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
           title="Cơ sở vật chất"
         >
           <Menu.Item key="/dashboard/clinics">Quản lý Phòng khám</Menu.Item>
-          {can("clinic.specialty.manage") && (
-            <Menu.Item key="/dashboard/specialties">
-              Quản lý Chuyên khoa
-            </Menu.Item>
-          )}
         </SubMenu>
 
         <SubMenu
@@ -141,6 +135,14 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
           title="Quản lý Danh mục"
         >
           <Menu.Item key="/dashboard/diseases">Quản lý Bệnh</Menu.Item>
+          <Menu.Item key="/dashboard/clinical-services/services">
+            Dịch vụ CLS
+          </Menu.Item>
+          {can("clinic.specialty.manage") && (
+            <Menu.Item key="/dashboard/specialties">
+              Danh sách chuyên khoa
+            </Menu.Item>
+          )}
         </SubMenu>
 
         <Menu.Item key="/dashboard/reports" icon={<BarChartOutlined />}>
