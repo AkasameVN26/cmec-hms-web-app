@@ -81,9 +81,6 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
           <Menu.Item key="/dashboard/inpatient/treatments">
             Lượt điều trị
           </Menu.Item>
-          <Menu.Item key="/dashboard/inpatient/wards">Khu điều trị</Menu.Item>
-          <Menu.Item key="/dashboard/inpatient/rooms">Phòng bệnh</Menu.Item>
-          <Menu.Item key="/dashboard/inpatient/beds">Giường bệnh</Menu.Item>
         </SubMenu>
 
         <SubMenu
@@ -127,6 +124,9 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
           title="Cơ sở vật chất"
         >
           <Menu.Item key="/dashboard/clinics">Quản lý Phòng khám</Menu.Item>
+          <Menu.Item key="/dashboard/inpatient/wards">Khu điều trị</Menu.Item>
+          <Menu.Item key="/dashboard/inpatient/rooms">Phòng bệnh</Menu.Item>
+          <Menu.Item key="/dashboard/inpatient/beds">Giường bệnh</Menu.Item>
         </SubMenu>
 
         <SubMenu
