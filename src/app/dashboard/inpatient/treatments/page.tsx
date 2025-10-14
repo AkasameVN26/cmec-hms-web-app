@@ -49,8 +49,9 @@ const InpatientListPage = () => {
           phieu_theo_doi_noi_tru ( thoi_gian_tao )
         `
         )
-        .eq("trang_thai_dieu_tri", "Đang điều trị")
-        .order("ngay_nhap_vien", { ascending: false });
+        .eq('trang_thai_dieu_tri', 'Đang điều trị')
+        .not('ho_so_benh_an.trang_thai', 'eq', 'Đã huỷ')
+        .order('ngay_nhap_vien', { ascending: false });
 
       if (error) throw error;
 
