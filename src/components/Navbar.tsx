@@ -80,6 +80,7 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
             >
                 <Menu.Item key="/dashboard/patients">Quản lý Bệnh nhân</Menu.Item>
                 <Menu.Item key="/dashboard/appointments">Quản lý Hồ sơ</Menu.Item>
+                <Menu.Item key="/dashboard/appointments/calendar">Đặt lịch hẹn nhanh</Menu.Item>
             </SubMenu>
         )}
 
