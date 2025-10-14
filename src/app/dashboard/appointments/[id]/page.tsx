@@ -15,8 +15,9 @@ const { Option } = Select;
 // ==============================================
 // Lịch sử Khám bệnh Tab Component
 // ==============================================
-const LichKhamTab = ({ record_id, patient_id, record_status }: { record_id: number, patient_id: string, record_status: string }) => {
+const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { record_id: number, patient_id: string, record_status: string, record_type: string }) => {
     const { user, roles, can } = useAuth();
+    const router = useRouter();
     const isAdmin = roles.includes('Quản lý');
     const isReceptionist = roles.includes('Lễ tân');
 
@@ -25,6 +26,7 @@ const LichKhamTab = ({ record_id, patient_id, record_status }: { record_id: numb
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [isConclusionModalVisible, setIsConclusionModalVisible] = useState(false);
     const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+    const [isAdmissionModalVisible, setIsAdmissionModalVisible] = useState(false);
     const [editingAppointment, setEditingAppointment] = useState<any | null>(null);
     const [viewingAppointment, setViewingAppointment] = useState<any | null>(null);
     const [doctors, setDoctors] = useState<any[]>([]);
@@ -36,6 +38,7 @@ const LichKhamTab = ({ record_id, patient_id, record_status }: { record_id: numb
     
     const [editForm] = Form.useForm();
     const [conclusionForm] = Form.useForm();
+    const [admissionForm] = Form.useForm();
 
     const appointmentTime = Form.useWatch('thoi_gian_kham', editForm);
     const isRecordCancelled = record_status === 'Đã huỷ';
@@ -57,7 +60,7 @@ const LichKhamTab = ({ record_id, patient_id, record_status }: { record_id: numb
     }, [record_id]);
 
     const fetchInitialData = useCallback(async () => {
-        const { data: doctorsData } = await supabase.from('bac_si').select('id_bac_si, tai_khoan!id_bac_si(ho_ten)');
+        const { data: doctorsData } = await supabase.from('bac_si').select('id_bac_si, tai_khoan!inner(ho_ten)');
         if (doctorsData) setDoctors(doctorsData);
 
         const { data: clinicsData } = await supabase.from('phong_kham').select('*');
@@ -183,6 +186,32 @@ const LichKhamTab = ({ record_id, patient_id, record_status }: { record_id: numb
         } catch (info) { console.log('Validate Failed:', info); message.error('Lưu thất bại, vui lòng kiểm tra lại thông tin.'); }
     };
 
+    const showAdmissionModal = () => {
+        admissionForm.resetFields();
+        admissionForm.setFieldsValue({ id_bac_si_phu_trach: user?.id });
+        setIsAdmissionModalVisible(true);
+    };
+
+    const handleAdmissionOk = async () => {
+        try {
+            const values = await admissionForm.validateFields();
+            const { error } = await supabase.rpc('admit_patient_to_inpatient', {
+                p_ho_so_id: record_id,
+                p_chan_doan: values.chan_doan_nhap_vien,
+                p_bac_si_id: values.id_bac_si_phu_trach,
+                p_ngay_nhap_vien: new Date().toISOString()
+            });
+
+            if (error) throw error;
+
+            message.success('Tạo lệnh nhập viện thành công! Bệnh án đã được chuyển thành hồ sơ nội trú.');
+            setIsAdmissionModalVisible(false);
+            router.refresh();
+        } catch (err: any) {
+            message.error('Lỗi khi tạo lệnh nhập viện: ' + err.message);
+        }
+    };
+
     const columns = [
         { title: 'Ngày khám', dataIndex: 'thoi_gian_kham', key: 'thoi_gian_kham', width: 180, render: (ts:string) => ts ? new Date(ts).toLocaleString('vi-VN') : '-' },
         { title: 'Bác sĩ', dataIndex: ['bac_si', 'tai_khoan', 'ho_ten'], key: 'bac_si', width: 200, render: (text:string) => <Typography.Text style={{ maxWidth: 200 }} ellipsis={{ tooltip: text }}>{text}</Typography.Text> },
@@ -210,7 +239,12 @@ const LichKhamTab = ({ record_id, patient_id, record_status }: { record_id: numb
 
     return (
         <div>
-            <Button onClick={() => handleEdit(null)} type="primary" style={{ marginBottom: 16 }} disabled={isRecordCancelled}>Tạo Lịch khám mới</Button>
+            <Space style={{ marginBottom: 16 }}>
+                <Button onClick={() => handleEdit(null)} type="primary" disabled={isRecordCancelled}>Tạo Lịch khám mới</Button>
+                {record_type === 'Ngoại trú' && can('inpatient.admission.create') && !isRecordCancelled && (
+                    <Button onClick={showAdmissionModal}>Tạo lệnh nhập viện</Button>
+                )}
+            </Space>
             <Table columns={columns} dataSource={appointments} loading={loading} rowKey="id_lich_kham" size="small" />
             
             {/* View Details Modal */}
@@ -281,6 +315,20 @@ const LichKhamTab = ({ record_id, patient_id, record_status }: { record_id: numb
                             })}<Form.Item><Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>Thêm thuốc</Button></Form.Item></>)}</Form.List>
                         </TabPane>
                     </Tabs>
+                </Form>
+            </Modal>
+
+            {/* Admission Modal */}
+            <Modal title="Tạo lệnh nhập viện" open={isAdmissionModalVisible} onOk={handleAdmissionOk} onCancel={() => setIsAdmissionModalVisible(false)} okText="Xác nhận Nhập viện" cancelText="Huỷ">
+                <Form form={admissionForm} layout="vertical">
+                    <Form.Item name="chan_doan_nhap_vien" label="Chẩn đoán nhập viện" rules={[{ required: true, message: 'Vui lòng nhập chẩn đoán khi nhập viện' }]}>
+                        <Input.TextArea rows={4} />
+                    </Form.Item>
+                    <Form.Item name="id_bac_si_phu_trach" label="Bác sĩ phụ trách" rules={[{ required: true, message: 'Vui lòng chọn bác sĩ phụ trách' }]}>
+                        <Select showSearch optionFilterProp="children" placeholder="Chọn bác sĩ">
+                            {doctors.map(d => <Option key={d.id_bac_si} value={d.id_bac_si}>{d.tai_khoan.ho_ten}</Option>)}
+                        </Select>
+                    </Form.Item>
                 </Form>
             </Modal>
         </div>
@@ -559,6 +607,200 @@ const DonThuocTab = ({ record_id }: { record_id: number }) => {
     );
 };
 
+// ==============================================
+// Điều trị nội trú Tab Component
+// ==============================================
+const InpatientTreatmentTab = ({ record_id, record_status }: { record_id: number, record_status: string }) => {
+    const { user, can } = useAuth();
+    const [treatmentRecord, setTreatmentRecord] = useState<any | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [isNoteModalVisible, setIsNoteModalVisible] = useState(false);
+    const [isNoteDetailModalVisible, setIsNoteDetailModalVisible] = useState(false);
+    const [isDischargeModalVisible, setIsDischargeModalVisible] = useState(false);
+    const [viewingNote, setViewingNote] = useState<any | null>(null);
+    const [noteForm] = Form.useForm();
+    const [dischargeForm] = Form.useForm();
+    const isRecordCancelled = record_status === 'Đã huỷ';
+
+    const fetchInpatientRecord = useCallback(async () => {
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('luot_dieu_tri_noi_tru')
+            .select(`
+                *,
+                bac_si:id_bac_si_phu_trach(tai_khoan!inner(ho_ten)),
+                giuong_benh(*, phong_benh(*, khu_dieu_tri(*))),
+                phieu_theo_doi_noi_tru(
+                    *,
+                    nhan_vien:id_nhan_vien_y_te(ho_ten)
+                )
+            `)
+            .eq('id_ho_so', record_id)
+            .order('thoi_gian_tao', { foreignTable: 'phieu_theo_doi_noi_tru', ascending: false })
+            .single();
+        
+        if (error && error.code !== 'PGRST116') { // PGRST116: 0 rows
+            message.error("Lỗi khi tải thông tin điều trị nội trú: " + error.message);
+        } else {
+            setTreatmentRecord(data);
+        }
+        setLoading(false);
+    }, [record_id]);
+
+    useEffect(() => {
+        fetchInpatientRecord();
+    }, [fetchInpatientRecord]);
+
+    const handleAddNote = () => {
+        noteForm.resetFields();
+        setIsNoteModalVisible(true);
+    };
+
+    const handleViewNoteDetails = (note: any) => {
+        setViewingNote(note);
+        setIsNoteDetailModalVisible(true);
+    };
+
+    const handleNoteOk = async () => {
+        try {
+            const values = await noteForm.validateFields();
+            const { error } = await supabase.from('phieu_theo_doi_noi_tru').insert({
+                id_luot_dieu_tri: treatmentRecord.id_luot_dieu_tri,
+                id_nhan_vien_y_te: user?.id,
+                ...values
+            });
+            if (error) throw error;
+            message.success('Thêm phiếu theo dõi thành công!');
+            setIsNoteModalVisible(false);
+            fetchInpatientRecord();
+        } catch (err: any) {
+            message.error('Lỗi khi thêm phiếu theo dõi: ' + err.message);
+        }
+    };
+
+    const showDischargeModal = () => {
+        dischargeForm.resetFields();
+        dischargeForm.setFieldsValue({ ngay_xuat_vien: dayjs() });
+        setIsDischargeModalVisible(true);
+    };
+
+    const handleDischargeOk = async () => {
+        try {
+            const values = await dischargeForm.validateFields();
+            const { error } = await supabase.rpc('discharge_patient', {
+                p_treatment_id: treatmentRecord.id_luot_dieu_tri,
+                p_discharge_diagnosis: values.chan_doan_xuat_vien,
+                p_discharge_date: values.ngay_xuat_vien.toISOString()
+            });
+            if (error) throw error;
+            message.success('Đã tạo lệnh xuất viện thành công!');
+            setIsDischargeModalVisible(false);
+            fetchInpatientRecord();
+        } catch (err: any) {
+            message.error('Lỗi khi tạo lệnh xuất viện: ' + err.message);
+        }
+    };
+
+    const noteColumns = [
+        { title: 'Thời gian', dataIndex: 'thoi_gian_tao', key: 'thoi_gian_tao', width: 170, render: (ts: string) => new Date(ts).toLocaleString('vi-VN') },
+        { title: 'Diễn biến bệnh', dataIndex: 'dien_bien_benh', key: 'dien_bien_benh', ellipsis: true },
+        { title: 'Y lệnh', dataIndex: 'y_lenh', key: 'y_lenh', ellipsis: true },
+        { title: 'Nhân viên', dataIndex: ['nhan_vien', 'ho_ten'], key: 'nhan_vien', width: 200 },
+        {
+            title: 'Hành động',
+            key: 'action',
+            width: 120,
+            render: (_: any, record: any) => (
+                <Button size="small" onClick={() => handleViewNoteDetails(record)}>Chi tiết</Button>
+            )
+        }
+    ];
+
+    if (loading) return <Spin />;
+    if (!treatmentRecord) return <Typography.Text>Bệnh nhân chưa có thông tin điều trị nội trú.</Typography.Text>;
+
+    const bed = treatmentRecord.giuong_benh;
+    const room = bed?.phong_benh;
+    const ward = room?.khu_dieu_tri;
+    const location = bed ? `${ward?.ten_khu || 'N/A'} - ${room.ten_phong} - Giường ${bed.so_giuong}` : 'Chưa xếp giường';
+    const isDischarged = treatmentRecord.trang_thai_dieu_tri === 'Đã xuất viện';
+
+    return (
+        <div>
+            <Descriptions bordered size="small" column={2} style={{ marginBottom: 24 }}>
+                <Descriptions.Item label="Ngày nhập viện">{new Date(treatmentRecord.ngay_nhap_vien).toLocaleString('vi-VN')}</Descriptions.Item>
+                <Descriptions.Item label="Bác sĩ phụ trách">{treatmentRecord.bac_si.tai_khoan.ho_ten}</Descriptions.Item>
+                <Descriptions.Item label="Chẩn đoán nhập viện" span={2}>{treatmentRecord.chan_doan_nhap_vien}</Descriptions.Item>
+                <Descriptions.Item label="Vị trí">{location}</Descriptions.Item>
+                <Descriptions.Item label="Trạng thái điều trị">
+                    <Tag color={isDischarged ? "success" : "blue"}>{treatmentRecord.trang_thai_dieu_tri}</Tag>
+                </Descriptions.Item>
+                {isDischarged && (
+                    <>
+                        <Descriptions.Item label="Ngày xuất viện">{new Date(treatmentRecord.ngay_xuat_vien).toLocaleString('vi-VN')}</Descriptions.Item>
+                        <Descriptions.Item label="Chẩn đoán xuất viện">{treatmentRecord.chan_doan_xuat_vien}</Descriptions.Item>
+                    </>
+                )}
+            </Descriptions>
+
+            <Title level={5}>Phiếu theo dõi</Title>
+            <Space style={{ marginBottom: 16 }}>
+                {!isDischarged && !isRecordCancelled && can('inpatient.note.create') && (
+                    <Button onClick={handleAddNote} type="primary">Thêm Phiếu theo dõi</Button>
+                )}
+                {!isDischarged && !isRecordCancelled && can('inpatient.record.update') && (
+                    <Button onClick={showDischargeModal}>Tạo lệnh xuất viện</Button>
+                )}
+            </Space>
+            <Table columns={noteColumns} dataSource={treatmentRecord.phieu_theo_doi_noi_tru} rowKey="id_phieu" size="small" />
+
+            <Modal title="Thêm Phiếu theo dõi mới" open={isNoteModalVisible} onOk={handleNoteOk} onCancel={() => setIsNoteModalVisible(false)} okText="Lưu" cancelText="Huỷ">
+                <Form form={noteForm} layout="vertical">
+                    <Form.Item name="dien_bien_benh" label="Diễn biến bệnh" rules={[{ required: true }]}>
+                        <Input.TextArea rows={4} />
+                    </Form.Item>
+                    <Form.Item name="y_lenh" label="Y lệnh" rules={[{ required: true }]}>
+                        <Input.TextArea rows={4} />
+                    </Form.Item>
+                    <Row gutter={16}>
+                        <Col span={8}><Form.Item name="nhip_tim" label="Nhịp tim (l/p)"><InputNumber style={{width: '100%'}} /></Form.Item></Col>
+                        <Col span={8}><Form.Item name="nhiet_do" label="Nhiệt độ (°C)"><InputNumber style={{width: '100%'}} /></Form.Item></Col>
+                        <Col span={8}><Form.Item name="nhip_tho" label="Nhịp thở (l/p)"><InputNumber style={{width: '100%'}} /></Form.Item></Col>
+                    </Row>
+                    <Form.Item name="huyet_ap" label="Huyết áp (mmHg)">
+                        <Input />
+                    </Form.Item>
+                </Form>
+            </Modal>
+
+            <Modal title="Tạo lệnh xuất viện" open={isDischargeModalVisible} onOk={handleDischargeOk} onCancel={() => setIsDischargeModalVisible(false)} okText="Xác nhận xuất viện" cancelText="Huỷ">
+                <Form form={dischargeForm} layout="vertical">
+                    <Form.Item name="ngay_xuat_vien" label="Ngày giờ xuất viện" rules={[{ required: true, message: 'Vui lòng chọn ngày xuất viện' }]}>
+                        <DatePicker showTime style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name="chan_doan_xuat_vien" label="Chẩn đoán xuất viện" rules={[{ required: true, message: 'Vui lòng nhập chẩn đoán khi xuất viện' }]}>
+                        <Input.TextArea rows={4} />
+                    </Form.Item>
+                </Form>
+            </Modal>
+
+            {viewingNote && (
+                <Modal title={`Chi tiết Phiếu theo dõi (${new Date(viewingNote.thoi_gian_tao).toLocaleString('vi-VN')})`} open={isNoteDetailModalVisible} onCancel={() => setIsNoteDetailModalVisible(false)} footer={<Button onClick={() => setIsNoteDetailModalVisible(false)}>Đóng</Button>}>
+                    <Descriptions bordered column={1} size="small">
+                        <Descriptions.Item label="Nhân viên thực hiện">{viewingNote.nhan_vien?.ho_ten || 'N/A'}</Descriptions.Item>
+                        <Descriptions.Item label="Diễn biến bệnh">{viewingNote.dien_bien_benh}</Descriptions.Item>
+                        <Descriptions.Item label="Y lệnh">{viewingNote.y_lenh}</Descriptions.Item>
+                        <Descriptions.Item label="Nhịp tim">{viewingNote.nhip_tim ? `${viewingNote.nhip_tim} lần/phút` : '-'}</Descriptions.Item>
+                        <Descriptions.Item label="Nhiệt độ">{viewingNote.nhiet_do ? `${viewingNote.nhiet_do} °C` : '-'}</Descriptions.Item>
+                        <Descriptions.Item label="Huyết áp">{viewingNote.huyet_ap || '-'}</Descriptions.Item>
+                        <Descriptions.Item label="Nhịp thở">{viewingNote.nhip_tho ? `${viewingNote.nhip_tho} lần/phút` : '-'}</Descriptions.Item>
+                    </Descriptions>
+                </Modal>
+            )}
+        </div>
+    );
+};
+
 
 // ==============================================
 // Main Page Component
@@ -657,7 +899,7 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
 
         <Tabs defaultActiveKey="1">
             <TabPane tab="Lịch sử Khám bệnh" key="1">
-                <LichKhamTab record_id={record.id_ho_so} patient_id={record.id_benh_nhan} record_status={record.trang_thai} />
+                <LichKhamTab record_id={record.id_ho_so} patient_id={record.id_benh_nhan} record_status={record.trang_thai} record_type={record.loai_benh_an} />
             </TabPane>
             <TabPane tab="Chỉ định & Kết quả CLS" key="2">
                 <ChiDinhClsTab record_id={record.id_ho_so} record_status={record.trang_thai} />
@@ -665,6 +907,11 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
             <TabPane tab="Đơn thuốc" key="3">
                 <DonThuocTab record_id={record.id_ho_so} />
             </TabPane>
+            {record.loai_benh_an === 'Nội trú' && (
+                <TabPane tab="Điều trị nội trú" key="4">
+                    <InpatientTreatmentTab record_id={record.id_ho_so} record_status={record.trang_thai} />
+                </TabPane>
+            )}
         </Tabs>
     </Card>
   );

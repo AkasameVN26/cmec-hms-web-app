@@ -79,7 +79,7 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
           title="Quản lý Nội trú"
         >
           <Menu.Item key="/dashboard/inpatient/treatments">
-            Lượt điều trị
+            Bệnh nhân nội trú
           </Menu.Item>
         </SubMenu>
 
