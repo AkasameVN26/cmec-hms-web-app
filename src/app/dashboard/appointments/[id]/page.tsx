@@ -9,8 +9,14 @@ import { useAuth } from '@/providers/AuthProvider';
 import dayjs from 'dayjs';
 
 const { TabPane } = Tabs;
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Option } = Select;
+
+// Helper to format currency
+const formatCurrency = (value: number | null | undefined) => {
+    if (value === null || value === undefined) return '0 VND';
+    return value.toLocaleString('vi-VN') + ' VND';
+};
 
 // ==============================================
 // Lịch sử Khám bệnh Tab Component
@@ -808,6 +814,9 @@ const InpatientTreatmentTab = ({ record_id, record_status }: { record_id: number
 const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
   const [record, setRecord] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isInvoiceModalVisible, setIsInvoiceModalVisible] = useState(false);
+  const [invoiceData, setInvoiceData] = useState<any | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
   const router = useRouter();
   const { can } = useAuth();
 
@@ -834,27 +843,37 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
     fetchRecord();
   }, [fetchRecord]);
 
-  const handleCloseRecord = () => {
-      Modal.confirm({
-          title: 'Xác nhận Đóng Hồ sơ Bệnh án',
-          content: `Bạn có chắc muốn đóng hồ sơ #${record.id_ho_so}? Hành động này sẽ hoàn tất luồng xử lý và không thể hoàn tác dễ dàng.`,
-          okText: 'Đóng hồ sơ',
-          okType: 'primary',
-          cancelText: 'Huỷ',
-          onOk: async () => {
-              const { error } = await supabase.from('ho_so_benh_an').update({
-                  trang_thai: 'Hoàn tất',
-                  thoi_gian_dong_ho_so: new Date().toISOString(),
-              }).eq('id_ho_so', record.id_ho_so);
+  const handleShowInvoice = async () => {
+      setIsClosing(true);
+      const { data, error } = await supabase.rpc('get_invoice_details', { p_ho_so_id: record.id_ho_so });
+      
+      if (error) {
+          message.error(`Lỗi khi lấy chi tiết hóa đơn: ${error.message}`);
+          setIsClosing(false);
+          return;
+      }
+      
+      setInvoiceData(data);
+      setIsInvoiceModalVisible(true);
+      setIsClosing(false);
+  };
 
-              if (error) {
-                  message.error(`Lỗi khi đóng hồ sơ: ${error.message}`);
-              } else {
-                  message.success('Đã đóng hồ sơ bệnh án thành công.');
-                  fetchRecord(); // Re-fetch data to show the new status
-              }
-          }
-      });
+  const handleConfirmPaymentAndClose = async () => {
+      setIsClosing(true);
+      const { error } = await supabase.from('ho_so_benh_an').update({
+          trang_thai: 'Hoàn tất',
+          thoi_gian_dong_ho_so: new Date().toISOString(),
+          tong_chi_phi: invoiceData?.total || 0
+      }).eq('id_ho_so', record.id_ho_so);
+
+      if (error) {
+          message.error(`Lỗi khi đóng hồ sơ: ${error.message}`);
+      } else {
+          message.success('Đã xác nhận thanh toán và đóng hồ sơ bệnh án thành công.');
+          setIsInvoiceModalVisible(false);
+          fetchRecord(); // Re-fetch data to show the new status
+      }
+      setIsClosing(false);
   };
 
   if (loading || !record) {
@@ -869,51 +888,114 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
     return <Tag color={color}>{status.toUpperCase()}</Tag>;
   }
 
-  return (
-    <Card>
-        <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
-            <Col>
-                <Button onClick={() => router.push('/dashboard/appointments')} type="link" style={{ padding: 0, marginBottom: 16 }}>
-                    &larr; Quay lại danh sách
-                </Button>
-                <Title level={2} style={{ margin: 0 }}>
-                    {`Hồ sơ Bệnh án #${record.id_ho_so}`}
-                </Title>
-            </Col>
-            <Col>
-                <Space>
-                    {renderStatusTag(record.trang_thai)}
-                    {record.trang_thai === 'Đang xử lý' && can('patient.encounter.update') && (
-                        <Button type="primary" onClick={handleCloseRecord}>Đóng hồ sơ</Button>
-                    )}
-                </Space>
-            </Col>
-        </Row>
-        
-        <Descriptions bordered size="small" column={2} style={{ marginBottom: 24 }}>
-            <Descriptions.Item label="Bệnh nhân">{record.benh_nhan?.ho_ten || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Ngày sinh">{record.benh_nhan?.ngay_sinh ? new Date(record.benh_nhan.ngay_sinh).toLocaleDateString('vi-VN') : '-'}</Descriptions.Item>
-            <Descriptions.Item label="Ngày mở hồ sơ">{new Date(record.thoi_gian_mo_ho_so).toLocaleString('vi-VN')}</Descriptions.Item>
-            <Descriptions.Item label="Loại bệnh án"><Tag color={record.loai_benh_an === 'Nội trú' ? 'red' : 'blue'}>{record.loai_benh_an}</Tag></Descriptions.Item>
-        </Descriptions>
+  const examColumns = [
+      { title: 'Lần khám', dataIndex: 'id', key: 'id', render: (id: number) => `LK#${id}` },
+      { title: 'Lý do', dataIndex: 'reason', key: 'reason' },
+      { title: 'Chi phí', dataIndex: 'cost', key: 'cost', render: formatCurrency, align: 'right' as const },
+  ];
 
-        <Tabs defaultActiveKey="1">
-            <TabPane tab="Lịch sử Khám bệnh" key="1">
-                <LichKhamTab record_id={record.id_ho_so} patient_id={record.id_benh_nhan} record_status={record.trang_thai} record_type={record.loai_benh_an} />
-            </TabPane>
-            <TabPane tab="Chỉ định & Kết quả CLS" key="2">
-                <ChiDinhClsTab record_id={record.id_ho_so} record_status={record.trang_thai} />
-            </TabPane>
-            <TabPane tab="Đơn thuốc" key="3">
-                <DonThuocTab record_id={record.id_ho_so} />
-            </TabPane>
-            {record.loai_benh_an === 'Nội trú' && (
-                <TabPane tab="Điều trị nội trú" key="4">
-                    <InpatientTreatmentTab record_id={record.id_ho_so} record_status={record.trang_thai} />
+  const serviceColumns = [
+      { title: 'Tên dịch vụ', dataIndex: 'name', key: 'name' },
+      { title: 'Chi phí', dataIndex: 'cost', key: 'cost', render: formatCurrency, align: 'right' as const },
+  ];
+
+  const prescriptionColumns = [
+      { title: 'Mã đơn', dataIndex: 'id', key: 'id', render: (id: number) => `ĐT#${id}` },
+      { title: 'Tên thuốc', dataIndex: ['medicines', 0, 'name'], key: 'name', render: (text: string, record: any) => record.medicines.map((m: any) => m.name).join(', ') },
+      { title: 'Tổng cộng', dataIndex: 'medicines', key: 'total', align: 'right' as const, render: (medicines: any[]) => formatCurrency(medicines.reduce((acc, m) => acc + m.total, 0)) },
+  ];
+
+  return (
+    <>
+        <Card>
+            <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
+                <Col>
+                    <Button onClick={() => router.push('/dashboard/appointments')} type="link" style={{ padding: 0, marginBottom: 16 }}>
+                        &larr; Quay lại danh sách
+                    </Button>
+                    <Title level={2} style={{ margin: 0 }}>
+                        {`Hồ sơ Bệnh án #${record.id_ho_so}`}
+                    </Title>
+                </Col>
+                <Col>
+                    <Space>
+                        {renderStatusTag(record.trang_thai)}
+                        {record.trang_thai === 'Đang xử lý' && can('patient.encounter.update') && (
+                            <Button type="primary" onClick={handleShowInvoice} loading={isClosing}>Đóng hồ sơ & Thanh toán</Button>
+                        )}
+                    </Space>
+                </Col>
+            </Row>
+            
+            <Descriptions bordered size="small" column={2} style={{ marginBottom: 24 }}>
+                <Descriptions.Item label="Bệnh nhân">{record.benh_nhan?.ho_ten || '-'}</Descriptions.Item>
+                <Descriptions.Item label="Ngày sinh">{record.benh_nhan?.ngay_sinh ? new Date(record.benh_nhan.ngay_sinh).toLocaleDateString('vi-VN') : '-'}</Descriptions.Item>
+                <Descriptions.Item label="Ngày mở hồ sơ">{new Date(record.thoi_gian_mo_ho_so).toLocaleString('vi-VN')}</Descriptions.Item>
+                <Descriptions.Item label="Loại bệnh án"><Tag color={record.loai_benh_an === 'Nội trú' ? 'red' : 'blue'}>{record.loai_benh_an}</Tag></Descriptions.Item>
+            </Descriptions>
+
+            <Tabs defaultActiveKey="1">
+                <TabPane tab="Lịch sử Khám bệnh" key="1">
+                    <LichKhamTab record_id={record.id_ho_so} patient_id={record.id_benh_nhan} record_status={record.trang_thai} record_type={record.loai_benh_an} />
                 </TabPane>
-            )}
-        </Tabs>
-    </Card>
+                <TabPane tab="Chỉ định & Kết quả CLS" key="2">
+                    <ChiDinhClsTab record_id={record.id_ho_so} record_status={record.trang_thai} />
+                </TabPane>
+                <TabPane tab="Đơn thuốc" key="3">
+                    <DonThuocTab record_id={record.id_ho_so} />
+                </TabPane>
+                {record.loai_benh_an === 'Nội trú' && (
+                    <TabPane tab="Điều trị nội trú" key="4">
+                        <InpatientTreatmentTab record_id={record.id_ho_so} record_status={record.trang_thai} />
+                    </TabPane>
+                )}
+            </Tabs>
+        </Card>
+
+        {invoiceData && (
+            <Modal
+                title={`Hóa đơn thanh toán cho Hồ sơ #${record.id_ho_so}`}
+                open={isInvoiceModalVisible}
+                onCancel={() => setIsInvoiceModalVisible(false)}
+                width={800}
+                footer={[
+                    <Button key="back" onClick={() => setIsInvoiceModalVisible(false)}>
+                        Huỷ
+                    </Button>,
+                    <Button key="submit" type="primary" loading={isClosing} onClick={handleConfirmPaymentAndClose}>
+                        Xác nhận thanh toán & Đóng hồ sơ
+                    </Button>,
+                ]}
+            >
+                <Space direction="vertical" style={{ width: '100%' }}>
+                    <Title level={4}>Bảng tổng hợp chi phí</Title>
+                    <Descriptions bordered size="small" column={1}>
+                        <Descriptions.Item label="Tổng phí khám bệnh">{formatCurrency(invoiceData.exam_fee)}</Descriptions.Item>
+                        <Descriptions.Item label="Tổng phí dịch vụ CLS">{formatCurrency(invoiceData.service_fee)}</Descriptions.Item>
+                        <Descriptions.Item label="Tổng tiền thuốc">{formatCurrency(invoiceData.medicine_fee)}</Descriptions.Item>
+                        <Descriptions.Item label={<Text strong>TỔNG CỘNG</Text>}>
+                            <Text strong style={{ fontSize: 18, color: '#1890ff' }}>{formatCurrency(invoiceData.total)}</Text>
+                        </Descriptions.Item>
+                    </Descriptions>
+
+                    {invoiceData.details?.exams?.length > 0 && <>
+                        <Title level={5} style={{ marginTop: 24 }}>Chi tiết Phí khám</Title>
+                        <Table size="small" columns={examColumns} dataSource={invoiceData.details.exams} pagination={false} rowKey="id" />
+                    </>}
+
+                    {invoiceData.details?.services?.length > 0 && <>
+                        <Title level={5} style={{ marginTop: 24 }}>Chi tiết Dịch vụ CLS</Title>
+                        <Table size="small" columns={serviceColumns} dataSource={invoiceData.details.services} pagination={false} rowKey="name" />
+                    </>}
+
+                    {invoiceData.details?.prescriptions?.length > 0 && <>
+                        <Title level={5} style={{ marginTop: 24 }}>Chi tiết Đơn thuốc</Title>
+                        <Table size="small" columns={prescriptionColumns} dataSource={invoiceData.details.prescriptions} pagination={false} rowKey="id" />
+                    </>}
+                </Space>
+            </Modal>
+        )}
+    </>
   );
 };
 
