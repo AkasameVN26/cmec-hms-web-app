@@ -12,6 +12,7 @@ import {
   Divider,
   Row,
   Col,
+  message,
 } from "antd";
 import {
   LoginOutlined,
@@ -40,7 +41,13 @@ const LandingPage = () => {
       if (error) {
         message.error("Không thể tải thông tin bệnh viện.");
       } else {
-        setHospitalInfo(data);
+        const info = Array.isArray(data) ? data[0] : data;
+        if (info) {
+            setHospitalInfo(info);
+        } else {
+            message.warning('Không tìm thấy thông tin bệnh viện trong cơ sở dữ liệu.');
+            setHospitalInfo(null); // Ensure it's null if no data
+        }
       }
       setLoading(false);
     };
@@ -62,7 +69,7 @@ const LandingPage = () => {
         }}
       >
         <Title level={3} style={{ color: "#1890ff", margin: "16px 0" }}>
-          {hospitalInfo ? hospitalInfo.ten_benh_vien : "Hệ thống CMEC"}
+          {loading ? "Đang tải..." : (hospitalInfo ? hospitalInfo.ten_benh_vien : "Hệ thống CMEC")}
         </Title>
       </Header>
       <Content style={{ padding: "48px" }}>
@@ -72,7 +79,7 @@ const LandingPage = () => {
               <Card style={{ textAlign: "center" }}>
                 <Title level={1}>
                   Chào mừng đến với{" "}
-                  {hospitalInfo?.ten_benh_vien || "Bệnh viện của chúng tôi"}
+                  {loading ? "..." : (hospitalInfo?.ten_benh_vien || "Bệnh viện của chúng tôi")}
                 </Title>
                 <Text type="secondary" style={{ fontSize: "16px" }}>
                   Chúng tôi cam kết cung cấp dịch vụ chăm sóc sức khỏe tận tâm
@@ -103,6 +110,9 @@ const LandingPage = () => {
                   </Row>
                 </Space>
                 <Divider>Thông tin liên hệ</Divider>
+                {!loading && !hospitalInfo && (
+                    <Text type="secondary">Chưa có thông tin bệnh viện để hiển thị.</Text>
+                )}
                 {hospitalInfo && (
                   <Descriptions
                     layout="vertical"

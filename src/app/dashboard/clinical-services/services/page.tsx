@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Button, Modal, Form, Input, message, Popconfirm, InputNumber, Select, Space, Row, Col } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import { supabase } from '@/lib/supabase';
@@ -20,14 +20,7 @@ const ClinicalServicesManagementPage = () => {
   const [filterSpecialty, setFilterSpecialty] = useState<number | null | string>(null);
   const [sortOrder, setSortOrder] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchServices();
-    // These are relatively static, so only fetch them once.
-    if (specialties.length === 0) fetchSpecialties();
-    if (clinics.length === 0) fetchClinics();
-  }, [filterSpecialty, sortOrder]); // Refetch when filter or sort changes
-
-  const fetchServices = async () => {
+  const fetchServices = useCallback(async () => {
     setLoading(true);
     try {
         let query = supabase.from('dich_vu_cls').select(`
@@ -55,17 +48,24 @@ const ClinicalServicesManagementPage = () => {
     } finally {
         setLoading(false);
     }
-  };
+  }, [filterSpecialty, sortOrder]);
 
-  const fetchSpecialties = async () => {
+  const fetchSpecialties = useCallback(async () => {
     const { data } = await supabase.from('chuyen_khoa').select('*').order('ten_chuyen_khoa');
     if (data) setSpecialties(data);
-  };
+  }, []);
 
-  const fetchClinics = async () => {
+  const fetchClinics = useCallback(async () => {
     const { data } = await supabase.from('phong_kham').select('*');
     if (data) setClinics(data);
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchServices();
+    // These are relatively static, so only fetch them once.
+    if (specialties.length === 0) fetchSpecialties();
+    if (clinics.length === 0) fetchClinics();
+  }, [fetchServices, fetchSpecialties, fetchClinics, specialties.length, clinics.length]); // Refetch when filter or sort changes
   
   const handleReset = () => {
       setFilterSpecialty(null);

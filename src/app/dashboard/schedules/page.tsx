@@ -32,7 +32,7 @@ const SchedulesPage = () => {
             setSelectedDoctor(doctorIdFromUrl);
             setAppliedDoctorFilter(doctorIdFromUrl);
         }
-    }, []); // Runs only once on mount
+    }, [searchParams]); // Runs only once on mount
 
     // Effect to fetch doctors list
     useEffect(() => {

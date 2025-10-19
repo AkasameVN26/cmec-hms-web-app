@@ -125,7 +125,8 @@ const PatientPortalLookupPage = () => {
                 dataSource={patientData.medical_records || []}
                 renderItem={(item: any) => (
                     <List.Item
-                        actions={[<Button type="primary" onClick={() => handleViewDetails(item)}>Xem chi tiết</Button>]}
+                        key={item.id_ho_so}
+                        actions={[<Button key="view" type="primary" onClick={() => handleViewDetails(item)}>Xem chi tiết</Button>]}
                     >
                         <List.Item.Meta
                             title={`Hồ sơ #${item.id_ho_so}`}

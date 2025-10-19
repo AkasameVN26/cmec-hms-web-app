@@ -110,7 +110,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       </Layout>
       <Modal
         title="Đổi địa chỉ email"
-        visible={isEmailModalVisible}
+        open={isEmailModalVisible}
         onCancel={() => setIsEmailModalVisible(false)}
         footer={null}
       >
