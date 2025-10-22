@@ -89,14 +89,14 @@ const ClinicalServicesPage = () => {
             key: 'action',
             render: (_: any, record: any) => (
                 <Space size="middle">
-                    <a onClick={() => showEditModal(record)}>Sửa</a>
+                    <Button type="default" onClick={() => showEditModal(record)}>Sửa</Button>
                     <Popconfirm
                         title="Bạn có chắc chắn muốn xóa dịch vụ này?"
                         onConfirm={() => handleDelete(record.id_dich_vu)}
                         okText="Xóa"
                         cancelText="Hủy"
                     >
-                        <a>Xóa</a>
+                        <Button type="default" danger>Xóa</Button>
                     </Popconfirm>
                 </Space>
             ),

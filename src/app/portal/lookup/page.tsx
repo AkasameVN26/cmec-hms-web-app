@@ -85,6 +85,17 @@ const PatientPortalLookupPage = () => {
         { title: 'Liều dùng', dataIndex: 'lieu_dung', key: 'lieu_dung' },
     ];
 
+    const progressNotesColumns = [
+        { title: 'Thời gian', dataIndex: 'thoi_gian_tao', key: 'thoi_gian_tao', render: (ts: string) => new Date(ts).toLocaleString('vi-VN') },
+        { title: 'Diễn biến bệnh', dataIndex: 'dien_bien_benh', key: 'dien_bien_benh' },
+        { title: 'Y lệnh', dataIndex: 'y_lenh', key: 'y_lenh' },
+        { title: 'Nhân viên', dataIndex: 'nhan_vien_y_te', key: 'nhan_vien_y_te' },
+        { title: 'Mạch (l/p)', dataIndex: 'nhip_tim', key: 'nhip_tim' },
+        { title: 'Nhiệt độ (°C)', dataIndex: 'nhiet_do', key: 'nhiet_do' },
+        { title: 'Huyết áp (mmHg)', dataIndex: 'huyet_ap', key: 'huyet_ap' },
+        { title: 'Nhịp thở (l/p)', dataIndex: 'nhip_tho', key: 'nhip_tho' },
+    ];
+
     const renderLookupForm = () => (
         <Row justify="center" align="middle" style={{ minHeight: '80vh' }}>
             <Col xs={24} sm={18} md={12} lg={8}>
@@ -167,6 +178,26 @@ const PatientPortalLookupPage = () => {
                                 ),
                             }}
                         />
+                    </TabPane>
+                    <TabPane tab="Thông tin nội trú" key="3">
+                        {recordDetails.inpatient_stay ? (
+                            <div>
+                                <Descriptions bordered size="small" column={2} style={{ marginBottom: 24 }} title="Chi tiết đợt điều trị">
+                                    <Descriptions.Item label="Ngày nhập viện">{new Date(recordDetails.inpatient_stay.ngay_nhap_vien).toLocaleString('vi-VN')}</Descriptions.Item>
+                                    <Descriptions.Item label="Ngày xuất viện">{recordDetails.inpatient_stay.ngay_xuat_vien ? new Date(recordDetails.inpatient_stay.ngay_xuat_vien).toLocaleString('vi-VN') : 'Chưa có'}</Descriptions.Item>
+                                    <Descriptions.Item label="Chẩn đoán nhập viện">{recordDetails.inpatient_stay.chan_doan_nhap_vien}</Descriptions.Item>
+                                    <Descriptions.Item label="Chẩn đoán xuất viện">{recordDetails.inpatient_stay.chan_doan_xuat_vien || 'Chưa có'}</Descriptions.Item>
+                                    <Descriptions.Item label="Bác sĩ phụ trách">{recordDetails.inpatient_stay.bac_si_phu_trach}</Descriptions.Item>
+                                    <Descriptions.Item label="Trạng thái"><Tag>{recordDetails.inpatient_stay.trang_thai_dieu_tri}</Tag></Descriptions.Item>
+                                    <Descriptions.Item label="Phòng bệnh">{recordDetails.inpatient_stay.phong_benh || 'Chưa có'}</Descriptions.Item>
+                                    <Descriptions.Item label="Giường bệnh">{recordDetails.inpatient_stay.giuong_benh || 'Chưa có'}</Descriptions.Item>
+                                </Descriptions>
+                                <Title level={5} style={{ marginTop: 24 }}>Phiếu theo dõi</Title>
+                                <Table columns={progressNotesColumns} dataSource={recordDetails.inpatient_stay.progress_notes || []} rowKey="thoi_gian_tao" pagination={{ pageSize: 5 }} />
+                            </div>
+                        ) : (
+                            <Empty description="Không có thông tin nội trú cho hồ sơ này." />
+                        )}
                     </TabPane>
                 </Tabs>
             </Card>
