@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Card, message, Spin, Descriptions, Button, Tag, Tabs, Row, Col, Typography, Table, Space, Modal, Form, DatePicker, Select, Input, InputNumber, Image } from 'antd';
-import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Card, message, Spin, Descriptions, Button, Tag, Tabs, Row, Col, Typography, Table, Space, Modal, Form, DatePicker, Select, Input, InputNumber, Image, List, Divider, Alert } from 'antd';
+import { MinusCircleOutlined, PlusOutlined, EditOutlined } from '@ant-design/icons';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
@@ -21,29 +21,35 @@ const formatCurrency = (value: number | null | undefined) => {
 // ==============================================
 // Lịch sử Khám bệnh Tab Component
 // ==============================================
-const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { record_id: number, patient_id: string, record_status: string, record_type: string }) => {
-    const { user, roles, can } = useAuth();
-    const router = useRouter();
-    const isAdmin = roles.includes('Quản lý');
-    const isReceptionist = roles.includes('Lễ tân');
-
+const LichKhamTab = ({ 
+    record_id, 
+    patient_id, 
+    record_status, 
+    record_type,
+    onConclude // Add onConclude prop
+}: { 
+    record_id: number, 
+    patient_id: string, 
+    record_status: string, 
+    record_type: string,
+    onConclude: (appointment: any) => void // Define prop type
+}) => {
+    const { user, can } = useAuth();
+    const router = useRouter(); 
     const [appointments, setAppointments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-    const [isConclusionModalVisible, setIsConclusionModalVisible] = useState(false);
     const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
     const [isAdmissionModalVisible, setIsAdmissionModalVisible] = useState(false);
+    
     const [editingAppointment, setEditingAppointment] = useState<any | null>(null);
     const [viewingAppointment, setViewingAppointment] = useState<any | null>(null);
     const [doctors, setDoctors] = useState<any[]>([]);
     const [clinics, setClinics] = useState<any[]>([]);
-    const [diseases, setDiseases] = useState<any[]>([]);
-    const [medicines, setMedicines] = useState<any[]>([]);
     const [availableDoctors, setAvailableDoctors] = useState<any[]>([]);
     const [isFindingDoctors, setIsFindingDoctors] = useState(false);
     
     const [editForm] = Form.useForm();
-    const [conclusionForm] = Form.useForm();
     const [admissionForm] = Form.useForm();
 
     const appointmentTime = Form.useWatch('thoi_gian_kham', editForm);
@@ -68,15 +74,8 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
     const fetchInitialData = useCallback(async () => {
         const { data: doctorsData } = await supabase.from('bac_si').select('id_bac_si, tai_khoan!inner(ho_ten)');
         if (doctorsData) setDoctors(doctorsData);
-
         const { data: clinicsData } = await supabase.from('phong_kham').select('*');
         if (clinicsData) setClinics(clinicsData);
-
-        const { data: diseasesData } = await supabase.from('benh').select('*');
-        if (diseasesData) setDiseases(diseasesData);
-
-        const { data: medicinesData } = await supabase.from('thuoc').select('*').gt('so_luong_ton_kho', 0);
-        if (medicinesData) setMedicines(medicinesData);
     }, []);
 
     useEffect(() => {
@@ -100,7 +99,7 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
             }
             setIsFindingDoctors(true);
             const date = appointmentTime.format('YYYY-MM-DD');
-            const shift = getShiftFromTime(appointmentTime);
+            const shift = getShiftFromTime(dayjs(appointmentTime));
 
             if (!shift) {
                 setAvailableDoctors([]);
@@ -129,8 +128,6 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
     const handleEdit = (appointment: any | null) => {
         setEditingAppointment(appointment);
         if (appointment) {
-            // Map new column name back to form field name (id_bac_si) if needed, or just use id_bac_si_phu_trach
-            // Here we use id_bac_si for the form field for simplicity, but we need to set it from id_bac_si_phu_trach
             editForm.setFieldsValue({
                 ...appointment,
                 id_bac_si: appointment.id_bac_si_phu_trach,
@@ -153,20 +150,19 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
             
             const submissionData = {
                 id_benh_nhan: patient_id,
-                id_bac_si_phu_trach: values.id_bac_si, // Map from form's id_bac_si
+                id_bac_si_phu_trach: values.id_bac_si,
                 id_phong_kham: values.id_phong_kham,
                 ly_do_kham: values.ly_do_kham,
                 chi_phi_kham: values.chi_phi_kham,
                 thoi_gian_kham: dayjs(values.thoi_gian_kham).toISOString(),
                 id_ho_so: record_id,
                 trang_thai: 'Đã Hẹn',
-                id_nguoi_dat_lich: user?.id, // New required field
-                loai_lich_kham: 'Khám bệnh' // Default
+                id_nguoi_dat_lich: user?.id,
+                loai_lich_kham: 'Khám bệnh'
             };
 
             let error;
             if (editingAppointment) {
-                // For update, we don't strictly need id_nguoi_dat_lich if not changing it, but good to have or exclude
                 const { id_nguoi_dat_lich, ...updateData } = submissionData;
                 const { error: updateError } = await supabase.from('lich_kham').update(updateData).eq('id_lich_kham', editingAppointment.id_lich_kham);
                 error = updateError;
@@ -192,25 +188,6 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
                 fetchAppointments();
             }
         }});
-    };
-
-    const handleConclude = (appointment: any) => {
-        setEditingAppointment(appointment);
-        const diseaseIds = appointment.ho_so_benh_an?.chan_doan?.map((d: any) => d.benh.id_benh) || [];
-        conclusionForm.setFieldsValue({ ...appointment, benh_ids: diseaseIds, ngay_tai_kham: appointment.ngay_tai_kham ? dayjs(appointment.ngay_tai_kham) : null, prescription: [] });
-        setIsConclusionModalVisible(true);
-    };
-
-    const handleConcludeOk = async () => {
-        try {
-            const values = await conclusionForm.validateFields();
-            const cleanedPrescription = (values.prescription || []).filter((p: any) => p && p.id_thuoc && p.so_luong && p.lieu_dung);
-            const { error } = await supabase.rpc('submit_conclusion_and_prescription', { p_lich_kham_id: editingAppointment.id_lich_kham, p_ket_luan: values.ket_luan, p_benh_ids: values.benh_ids || [], p_medicines: cleanedPrescription, p_ngay_tai_kham: values.ngay_tai_kham ? dayjs(values.ngay_tai_kham).format('YYYY-MM-DD') : null });
-            if (error) throw error;
-            message.success('Đã lưu kết luận và đơn thuốc.');
-            setIsConclusionModalVisible(false);
-            fetchAppointments();
-        } catch (info) { console.log('Validate Failed:', info); message.error('Lưu thất bại, vui lòng kiểm tra lại thông tin.'); }
     };
 
     const showAdmissionModal = () => {
@@ -258,8 +235,10 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
                     <Button size="small" onClick={() => handleViewDetails(record)}>Chi tiết</Button>
                     {!isRecordCancelled && (
                         <>
-                            {(isReceptionist || isAdmin) && record.trang_thai === 'Đã Hẹn' && <Button size="small" onClick={() => handleEdit(record)}>Cập nhật</Button>}
-                            {((can('appointment.result.update.assigned') && record.id_bac_si_phu_trach === user?.id) || can('appointment.update.all')) && record.trang_thai === 'Đã Hẹn' && <Button type="primary" size="small" onClick={() => handleConclude(record)}>Kết luận & Kê đơn</Button>}
+                            {record.trang_thai === 'Đã Hẹn' && <Button size="small" onClick={() => handleEdit(record)}>Cập nhật</Button>}
+                            {((can('appointment.result.update.assigned') && record.id_bac_si_phu_trach === user?.id) || can('appointment.update.all')) && record.trang_thai === 'Đã Hẹn' && (
+                                <Button type="primary" size="small" onClick={() => onConclude(record)}>Kết luận & Kê đơn</Button>
+                            )}
                         </>
                     )}
                 </Space>
@@ -277,7 +256,6 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
             </Space>
             <Table columns={columns} dataSource={appointments} loading={loading} rowKey="id_lich_kham" size="small" />
             
-            {/* View Details Modal */}
             {viewingAppointment && (
                 <Modal title={`Chi tiết Lịch khám #${viewingAppointment.id_lich_kham}`} open={isDetailModalVisible} onCancel={() => setIsDetailModalVisible(false)} footer={<Button onClick={() => setIsDetailModalVisible(false)}>Đóng</Button>}>
                     <Descriptions bordered column={1} size="small">
@@ -294,7 +272,6 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
                 </Modal>
             )}
 
-            {/* Edit/Create Modal */}
             <Modal title={editingAppointment ? `Cập nhật Lịch khám #${editingAppointment.id_lich_kham}` : 'Tạo Lịch khám mới'} open={isEditModalVisible} onCancel={() => setIsEditModalVisible(false)} footer={[<Button key="back" onClick={() => setIsEditModalVisible(false)}>Đóng</Button>, (editingAppointment && <Button key="cancel" danger onClick={handleCancelAppointment}>Huỷ lịch</Button>), <Button key="submit" type="primary" onClick={handleEditOk}>Lưu</Button>]} width={600}>
                 <Form form={editForm} layout="vertical">
                     <Form.Item name="ly_do_kham" label="Lý do khám" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
@@ -310,41 +287,6 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
                     <Form.Item name="chi_phi_kham" label="Chi phí khám (VND)">
                         <InputNumber<number> style={{ width: '100%' }} placeholder="Nhập chi phí" min={0} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value ? parseInt(value.replace(/\$\s?|(,*)/g, '')) : 0} />
                     </Form.Item>
-                </Form>
-            </Modal>
-
-            {/* Conclusion Modal */}
-            <Modal title={`Kết luận cho Lịch khám #${editingAppointment?.id_lich_kham}`} open={isConclusionModalVisible} onOk={handleConcludeOk} onCancel={() => setIsConclusionModalVisible(false)} okText="Lưu Kết luận & Đơn thuốc" cancelText="Huỷ" width={800}>
-                <Form form={conclusionForm} layout="vertical">
-                    <Tabs defaultActiveKey="1">
-                        <TabPane tab="Kết luận & Chẩn đoán" key="1">
-                            <Form.Item name="ket_luan" label="Kết luận của Bác sĩ" rules={[{ required: true }]}><Input.TextArea rows={6} spellCheck={false} /></Form.Item>
-                            <Form.Item name="benh_ids" label="Chẩn đoán"><Select mode="multiple" allowClear placeholder="Chọn các chẩn đoán (nếu có)" optionFilterProp="children">{diseases.map(d => <Option key={d.id_benh} value={d.id_benh}>{d.ten_benh}</Option>)}</Select></Form.Item>
-                            <Form.Item name="ngay_tai_kham" label="Ngày tái khám">
-                                <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
-                            </Form.Item>
-                        </TabPane>
-                        <TabPane tab="Kê đơn thuốc" key="2">
-                            <Form.List name="prescription">{(fields, { add, remove }) => (<>{fields.map(({ key, name, ...restField }) => {
-                                const selectedMedicineId = conclusionForm.getFieldValue(['prescription', name, 'id_thuoc']);
-                                const unit = medicines.find(m => m.id_thuoc === selectedMedicineId)?.don_vi_tinh;
-
-                                return (<Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
-                                    <Form.Item {...restField} name={[name, 'id_thuoc']} rules={[{ required: true, message: 'Vui lòng chọn thuốc' }]} style={{width: '250px'}}>
-                                        <Select showSearch placeholder="Chọn thuốc" optionFilterProp="children" onChange={() => conclusionForm.setFieldsValue({ prescription: [...conclusionForm.getFieldValue('prescription')]}) }>{medicines.map(m => <Option key={m.id_thuoc} value={m.id_thuoc}>{`${m.ten_thuoc} (Tồn: ${m.so_luong_ton_kho})`}</Option>)}</Select>
-                                    </Form.Item>
-                                    <Form.Item {...restField} name={[name, 'so_luong']} rules={[{ required: true, message: 'Nhập SL' }]}>
-                                        <InputNumber placeholder="SL" min={1} style={{width: '70px'}}/>
-                                    </Form.Item>
-                                    <span style={{ minWidth: '40px' }}>{unit}</span>
-                                    <Form.Item {...restField} name={[name, 'lieu_dung']} rules={[{ required: true, message: 'Nhập liều dùng' }]} style={{width: '250px'}}>
-                                        <Input placeholder="Liều dùng (VD: Sáng 1 viên, tối 1 viên)" spellCheck={false} />
-                                    </Form.Item>
-                                    <MinusCircleOutlined onClick={() => remove(name)} />
-                                </Space>)
-                            })}<Form.Item><Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>Thêm thuốc</Button></Form.Item></>)}</Form.List>
-                        </TabPane>
-                    </Tabs>
                 </Form>
             </Modal>
 
@@ -364,6 +306,7 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
         </div>
     );
 };
+
 // ==============================================
 // Chỉ định CLS Tab Component
 // ==============================================
@@ -841,15 +784,40 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
   const [isInvoiceModalVisible, setIsInvoiceModalVisible] = useState(false);
   const [invoiceData, setInvoiceData] = useState<any | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  
+  // Diagnosis Management State
+  const [diseases, setDiseases] = useState<any[]>([]);
+  const [noteTypes, setNoteTypes] = useState<any[]>([]); // New state for Note Types
+  const [isDiagnosisModalVisible, setIsDiagnosisModalVisible] = useState(false);
+  const [isAllDiagnosesModalVisible, setIsAllDiagnosesModalVisible] = useState(false);
+  const [isConclusionModalVisible, setIsConclusionModalVisible] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<any | null>(null);
+  const [diagnosisForm] = Form.useForm();
+  const [conclusionForm] = Form.useForm();
+  const [noteForm] = Form.useForm(); // Form for Notes
+  const [updatingDiagnosis, setUpdatingDiagnosis] = useState(false);
+  const [medicines, setMedicines] = useState<any[]>([]);
+
   const router = useRouter();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
+
+  const classifiedDiagnoses = useMemo(() => {
+      if (!record?.chan_doan) return { main: [], others: [] };
+      const main = record.chan_doan.filter((d: any) => d.loai_chan_doan === 'Bệnh chính');
+      const others = record.chan_doan.filter((d: any) => d.loai_chan_doan !== 'Bệnh chính');
+      return { main, others };
+  }, [record]);
 
   const fetchRecord = useCallback(async () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('ho_so_benh_an')
         .select(`*,
-            benh_nhan:id_benh_nhan(*)
+            benh_nhan:id_benh_nhan(*),
+            chan_doan(
+                loai_chan_doan,
+                benh:id_benh(id_benh, ten_benh)
+            )
         `)
         .eq('id_ho_so', params.id)
         .single();
@@ -863,9 +831,158 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
       setLoading(false);
     }, [params.id, router]);
 
+  const fetchInitialData = useCallback(async () => {
+      const { data: diseasesData } = await supabase.from('benh').select('*');
+      if (diseasesData) setDiseases(diseasesData);
+      
+      const { data: medicinesData } = await supabase.from('thuoc').select('*').gt('so_luong_ton_kho', 0);
+      if (medicinesData) setMedicines(medicinesData);
+
+      const { data: noteTypesData } = await supabase.from('loai_ghi_chu').select('*');
+      if (noteTypesData) setNoteTypes(noteTypesData);
+  }, []);
+
   useEffect(() => {
     fetchRecord();
-  }, [fetchRecord]);
+    fetchInitialData();
+  }, [fetchRecord, fetchInitialData]);
+
+  const handleEditDiagnosis = () => {
+      const currentDiagnoses = record?.chan_doan?.map((d: any) => ({
+          id_benh: d.benh.id_benh,
+          loai_chan_doan: d.loai_chan_doan
+      })) || [];
+      diagnosisForm.setFieldsValue({ diagnoses: currentDiagnoses });
+      setIsDiagnosisModalVisible(true);
+  };
+
+  const handleSaveDiagnoses = async () => {
+      try {
+          setUpdatingDiagnosis(true);
+          const values = await diagnosisForm.validateFields();
+          const newDiagnoses = values.diagnoses || [];
+
+          // 1. Delete existing diagnoses for this record
+          const { error: deleteError } = await supabase
+              .from('chan_doan')
+              .delete()
+              .eq('id_ho_so', record.id_ho_so);
+          
+          if (deleteError) throw deleteError;
+
+          // 2. Insert new diagnoses
+          if (newDiagnoses.length > 0) {
+              const insertData = newDiagnoses.map((d: any) => ({
+                  id_ho_so: record.id_ho_so,
+                  id_benh: d.id_benh,
+                  loai_chan_doan: d.loai_chan_doan
+              }));
+              
+              const { error: insertError } = await supabase
+                  .from('chan_doan')
+                  .insert(insertData);
+              
+              if (insertError) throw insertError;
+          }
+
+          message.success('Cập nhật chẩn đoán thành công!');
+          setIsDiagnosisModalVisible(false);
+          fetchRecord(); // Refresh data
+      } catch (err: any) {
+          message.error('Lỗi cập nhật chẩn đoán: ' + err.message);
+      } finally {
+          setUpdatingDiagnosis(false);
+      }
+  };
+
+  const handleConclude = (appointment: any) => {
+      setEditingAppointment(appointment);
+      
+      // Prepare diagnosis data for the form
+      const currentDiagnoses = record?.chan_doan?.map((d: any) => ({
+          id_benh: d.benh.id_benh,
+          loai_chan_doan: d.loai_chan_doan
+      })) || [];
+
+      conclusionForm.setFieldsValue({ 
+          ket_luan: appointment.ket_luan,
+          ngay_tai_kham: appointment.ngay_tai_kham ? dayjs(appointment.ngay_tai_kham) : null, 
+          diagnoses: currentDiagnoses, // Fill the diagnosis list
+          prescription: [] 
+      });
+      setIsConclusionModalVisible(true);
+  };
+
+  const handleConcludeOk = async () => {
+        try {
+            const values = await conclusionForm.validateFields();
+            
+            // 1. Sync Diagnoses (Delete old, Insert new) - Similar to handleSaveDiagnoses
+            const newDiagnoses = values.diagnoses || [];
+            // Delete existing for this record
+            const { error: deleteError } = await supabase.from('chan_doan').delete().eq('id_ho_so', record.id_ho_so);
+            if (deleteError) throw deleteError;
+            
+            // Insert new
+            if (newDiagnoses.length > 0) {
+                const insertData = newDiagnoses.map((d: any) => ({
+                    id_ho_so: record.id_ho_so,
+                    id_benh: d.id_benh,
+                    loai_chan_doan: d.loai_chan_doan
+                }));
+                const { error: insertError } = await supabase.from('chan_doan').insert(insertData);
+                if (insertError) throw insertError;
+            }
+
+            // 2. Submit Prescription and Conclusion Text
+            const cleanedPrescription = (values.prescription || []).filter((p: any) => p && p.id_thuoc && p.so_luong && p.lieu_dung);
+            const { error } = await supabase.rpc('submit_conclusion_and_prescription', { 
+                p_lich_kham_id: editingAppointment.id_lich_kham, 
+                p_ket_luan: values.ket_luan, 
+                p_benh_ids: [], // We handled diagnosis manually above
+                p_medicines: cleanedPrescription, 
+                p_ngay_tai_kham: values.ngay_tai_kham ? dayjs(values.ngay_tai_kham).format('YYYY-MM-DD') : null 
+            });
+            if (error) throw error;
+
+            message.success('Đã lưu kết luận, chẩn đoán và đơn thuốc.');
+            setIsConclusionModalVisible(false);
+            fetchRecord();
+        } catch (info: any) { 
+            console.log('Validate Failed:', info); 
+            message.error('Lỗi: ' + (info.message || 'Vui lòng kiểm tra lại thông tin.')); 
+        }
+    };
+
+  const handleSaveNote = async () => {
+      try {
+          const values = await noteForm.validateFields();
+          
+          // Validate JSON if present
+          if (values.du_lieu_cau_truc) {
+              try {
+                  JSON.parse(values.du_lieu_cau_truc);
+              } catch (e) {
+                  throw new Error('Dữ liệu cấu trúc không phải là JSON hợp lệ.');
+              }
+          }
+
+          const { error } = await supabase.from('ghi_chu_y_te').insert({
+              id_ho_so: record.id_ho_so,
+              id_loai_ghi_chu: values.id_loai_ghi_chu,
+              id_nguoi_tao: user?.id,
+              noi_dung_ghi_chu: values.noi_dung_ghi_chu,
+              du_lieu_cau_truc: values.du_lieu_cau_truc ? JSON.parse(values.du_lieu_cau_truc) : null
+          });
+
+          if (error) throw error;
+
+          message.success('Đã lưu ghi chú y tế.');
+          noteForm.resetFields();
+      } catch (err: any) {
+          message.error('Lỗi lưu ghi chú: ' + err.message);
+      }
+  };
 
   const handleShowInvoice = async () => {
       setIsClosing(true);
@@ -956,11 +1073,40 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
                 <Descriptions.Item label="Ngày sinh">{record.benh_nhan?.ngay_sinh ? new Date(record.benh_nhan.ngay_sinh).toLocaleDateString('vi-VN') : '-'}</Descriptions.Item>
                 <Descriptions.Item label="Ngày mở hồ sơ">{new Date(record.thoi_gian_mo_ho_so).toLocaleString('vi-VN')}</Descriptions.Item>
                 <Descriptions.Item label="Loại bệnh án"><Tag color={record.loai_benh_an === 'Nội trú' ? 'red' : 'blue'}>{record.loai_benh_an}</Tag></Descriptions.Item>
+                <Descriptions.Item label="Chẩn đoán" span={2}>
+                    <Space wrap>
+                        {classifiedDiagnoses.main.length + classifiedDiagnoses.others.length > 0 ? (
+                            <>
+                                {[...classifiedDiagnoses.main, ...classifiedDiagnoses.others].slice(0, 3).map((d: any, index: number) => (
+                                    <Tag key={index} color={d.loai_chan_doan === 'Bệnh chính' ? 'volcano' : 'geekblue'}>
+                                        {d.benh.ten_benh}
+                                    </Tag>
+                                ))}
+                                {classifiedDiagnoses.main.length + classifiedDiagnoses.others.length > 3 && (
+                                    <Button type="link" size="small" onClick={() => setIsAllDiagnosesModalVisible(true)}>
+                                        (+{classifiedDiagnoses.main.length + classifiedDiagnoses.others.length - 3})
+                                    </Button>
+                                )}
+                            </>
+                        ) : (
+                            <Text type="secondary">Chưa có chẩn đoán</Text>
+                        )}
+                        {record?.trang_thai === 'Đang xử lý' && can('patient.diagnosis.update') && (
+                            <Button type="link" size="small" icon={<EditOutlined />} onClick={handleEditDiagnosis}>Cập nhật</Button>
+                        )}
+                    </Space>
+                </Descriptions.Item>
             </Descriptions>
 
             <Tabs defaultActiveKey="1">
                 <TabPane tab="Lịch sử Khám bệnh" key="1">
-                    <LichKhamTab record_id={record.id_ho_so} patient_id={record.id_benh_nhan} record_status={record.trang_thai} record_type={record.loai_benh_an} />
+                    <LichKhamTab 
+                        record_id={record.id_ho_so} 
+                        patient_id={record.id_benh_nhan} 
+                        record_status={record.trang_thai} 
+                        record_type={record.loai_benh_an} 
+                        onConclude={handleConclude}
+                    />
                 </TabPane>
                 <TabPane tab="Chỉ định & Kết quả CLS" key="2">
                     <ChiDinhClsTab record_id={record.id_ho_so} record_status={record.trang_thai} />
@@ -975,6 +1121,206 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
                 )}
             </Tabs>
         </Card>
+
+        {/* Diagnosis Edit Modal */}
+        <Modal
+            title="Cập nhật Chẩn đoán"
+            open={isDiagnosisModalVisible}
+            onOk={handleSaveDiagnoses}
+            onCancel={() => setIsDiagnosisModalVisible(false)}
+            confirmLoading={updatingDiagnosis}
+            width={700}
+        >
+            <Form form={diagnosisForm} layout="vertical">
+                <Form.List name="diagnoses">
+                    {(fields, { add, remove }) => (
+                        <>
+                            {fields.map(({ key, name, ...restField }) => (
+                                <Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
+                                    <Form.Item
+                                        {...restField}
+                                        name={[name, 'id_benh']}
+                                        rules={[{ required: true, message: 'Chọn bệnh' }]}
+                                        style={{ width: '350px' }}
+                                    >
+                                        <Select showSearch placeholder="Chọn bệnh" optionFilterProp="children">
+                                            {diseases.map(d => <Option key={d.id_benh} value={d.id_benh}>{d.ten_benh}</Option>)}
+                                        </Select>
+                                    </Form.Item>
+                                    <Form.Item
+                                        {...restField}
+                                        name={[name, 'loai_chan_doan']}
+                                        rules={[{ required: true, message: 'Chọn loại' }]}
+                                        style={{ width: '200px' }}
+                                        initialValue="Bệnh chính"
+                                    >
+                                        <Select>
+                                            <Option value="Bệnh chính">Bệnh chính</Option>
+                                            <Option value="Bệnh kèm theo">Bệnh kèm theo</Option>
+                                        </Select>
+                                    </Form.Item>
+                                    <MinusCircleOutlined onClick={() => remove(name)} />
+                                </Space>
+                            ))}
+                            <Form.Item>
+                                <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                                    Thêm chẩn đoán
+                                </Button>
+                            </Form.Item>
+                        </>
+                    )}
+                </Form.List>
+            </Form>
+        </Modal>
+
+        {/* New Modal for All Diagnoses */}
+        <Modal
+            title="Tất cả Chẩn đoán"
+            open={isAllDiagnosesModalVisible}
+            onCancel={() => setIsAllDiagnosesModalVisible(false)}
+            footer={[
+                <Button key="close" onClick={() => setIsAllDiagnosesModalVisible(false)}>Đóng</Button>,
+                record?.trang_thai === 'Đang xử lý' && can('patient.diagnosis.update') && (
+                    <Button 
+                        key="update" 
+                        type="primary" 
+                        icon={<EditOutlined />} 
+                        onClick={() => {
+                            setIsAllDiagnosesModalVisible(false);
+                            handleEditDiagnosis();
+                        }}
+                    >
+                        Cập nhật
+                    </Button>
+                )
+            ]}
+        >
+            <Text strong style={{ display: 'block', marginBottom: 8, color: '#cf1322' }}>Chẩn đoán chính</Text>
+            {classifiedDiagnoses.main.length > 0 ? (
+                <List
+                    size="small"
+                    dataSource={classifiedDiagnoses.main}
+                    renderItem={(item: any) => (
+                        <List.Item style={{ padding: '4px 0' }}>
+                            <Tag color="volcano">{item.benh.ten_benh}</Tag>
+                        </List.Item>
+                    )}
+                />
+            ) : <Text type="secondary" style={{ marginLeft: 16 }}>Chưa có thông tin</Text>}
+
+            <Divider style={{ margin: '16px 0' }} />
+
+            <Text strong style={{ display: 'block', marginBottom: 8, color: '#1d39c4' }}>Bệnh kèm theo</Text>
+            {classifiedDiagnoses.others.length > 0 ? (
+                <List
+                    size="small"
+                    dataSource={classifiedDiagnoses.others}
+                    renderItem={(item: any) => (
+                        <List.Item style={{ padding: '4px 0' }}>
+                            <Tag color="geekblue">{item.benh.ten_benh}</Tag>
+                        </List.Item>
+                    )}
+                />
+            ) : <Text type="secondary" style={{ marginLeft: 16 }}>Không có</Text>}
+        </Modal>
+
+        {/* Conclusion Modal */}
+        <Modal title={`Kết luận cho Lịch khám #${editingAppointment?.id_lich_kham}`} open={isConclusionModalVisible} onOk={handleConcludeOk} onCancel={() => setIsConclusionModalVisible(false)} okText="Lưu Kết luận & Đơn thuốc" cancelText="Huỷ" width={900}>
+            <Form form={conclusionForm} layout="vertical">
+                <Tabs defaultActiveKey="1">
+                    <TabPane tab="Kết luận & Chẩn đoán" key="1">
+                        {/* Integrated Diagnosis Editing */}
+                        <Text strong style={{display: 'block', marginBottom: 8}}>Danh sách chẩn đoán:</Text>
+                        <Form.List name="diagnoses">
+                            {(fields, { add, remove }) => (
+                                <>
+                                    {fields.map(({ key, name, ...restField }) => (
+                                        <Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
+                                            <Form.Item
+                                                {...restField}
+                                                name={[name, 'id_benh']}
+                                                rules={[{ required: true, message: 'Chọn bệnh' }]}
+                                                style={{ width: '350px' }}
+                                            >
+                                                <Select showSearch placeholder="Chọn bệnh" optionFilterProp="children">
+                                                    {diseases.map(d => <Option key={d.id_benh} value={d.id_benh}>{d.ten_benh}</Option>)}
+                                                </Select>
+                                            </Form.Item>
+                                            <Form.Item
+                                                {...restField}
+                                                name={[name, 'loai_chan_doan']}
+                                                rules={[{ required: true, message: 'Chọn loại' }]}
+                                                style={{ width: '200px' }}
+                                                initialValue="Bệnh chính"
+                                            >
+                                                <Select>
+                                                    <Option value="Bệnh chính">Bệnh chính</Option>
+                                                    <Option value="Bệnh kèm theo">Bệnh kèm theo</Option>
+                                                </Select>
+                                            </Form.Item>
+                                            <MinusCircleOutlined onClick={() => remove(name)} style={{ color: 'red' }} />
+                                        </Space>
+                                    ))}
+                                    <Form.Item>
+                                        <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                                            Thêm chẩn đoán
+                                        </Button>
+                                    </Form.Item>
+                                </>
+                            )}
+                        </Form.List>
+
+                        <Divider />
+
+                        <Form.Item name="ket_luan" label="Lời dặn / Tóm tắt của Bác sĩ" rules={[{ required: true }]}>
+                            <Input.TextArea rows={4} spellCheck={false} placeholder="Nhập lời dặn dò, tóm tắt quá trình khám..." />
+                        </Form.Item>
+                        
+                        <Form.Item name="ngay_tai_kham" label="Ngày tái khám">
+                            <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
+                        </Form.Item>
+                    </TabPane>
+                    
+                    <TabPane tab="Kê đơn thuốc" key="2">
+                        <Form.List name="prescription">{(fields, { add, remove }) => (<>{fields.map(({ key, name, ...restField }) => {
+                            const selectedMedicineId = conclusionForm.getFieldValue(['prescription', name, 'id_thuoc']);
+                            const unit = medicines.find(m => m.id_thuoc === selectedMedicineId)?.don_vi_tinh;
+
+                            return (<Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
+                                <Form.Item {...restField} name={[name, 'id_thuoc']} rules={[{ required: true, message: 'Vui lòng chọn thuốc' }]} style={{width: '250px'}}>
+                                    <Select showSearch placeholder="Chọn thuốc" optionFilterProp="children" onChange={() => conclusionForm.setFieldsValue({ prescription: [...conclusionForm.getFieldValue('prescription')]}) }>{medicines.map(m => <Option key={m.id_thuoc} value={m.id_thuoc}>{`${m.ten_thuoc} (Tồn: ${m.so_luong_ton_kho})`}</Option>)}</Select>
+                                </Form.Item>
+                                <Form.Item {...restField} name={[name, 'so_luong']} rules={[{ required: true, message: 'Nhập SL' }]}>
+                                    <InputNumber placeholder="SL" min={1} style={{width: '70px'}}/>
+                                </Form.Item>
+                                <span style={{ minWidth: '40px' }}>{unit}</span>
+                                <Form.Item {...restField} name={[name, 'lieu_dung']} rules={[{ required: true, message: 'Nhập liều dùng' }]} style={{width: '250px'}}>
+                                    <Input placeholder="Liều dùng (VD: Sáng 1 viên, tối 1 viên)" spellCheck={false} />
+                                </Form.Item>
+                                <MinusCircleOutlined onClick={() => remove(name)} />
+                            </Space>)
+                        })}<Form.Item><Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>Thêm thuốc</Button></Form.Item></>)}</Form.List>
+                    </TabPane>
+
+                    <TabPane tab="Ghi chú Y tế" key="3">
+                        <Form form={noteForm} layout="vertical" onFinish={handleSaveNote}>
+                            <Form.Item name="id_loai_ghi_chu" label="Loại ghi chú" rules={[{ required: true, message: 'Vui lòng chọn loại ghi chú' }]}>
+                                <Select placeholder="Chọn loại ghi chú (Diễn biến, Y lệnh...)">
+                                    {noteTypes.map(nt => <Option key={nt.id_loai_ghi_chu} value={nt.id_loai_ghi_chu}>{nt.ten_loai_ghi_chu}</Option>)}
+                                </Select>
+                            </Form.Item>
+                            <Form.Item name="noi_dung_ghi_chu" label="Nội dung ghi chú" rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}>
+                                <Input.TextArea rows={6} placeholder="Nhập nội dung chi tiết..." />
+                            </Form.Item>
+                            <Form.Item name="du_lieu_cau_truc" label="Dữ liệu cấu trúc (JSON)" tooltip="Dành cho các dữ liệu có định dạng đặc biệt">
+                                <Input.TextArea rows={4} placeholder='{"key": "value"}' style={{ fontFamily: 'monospace' }} />
+                            </Form.Item>
+                            <Button type="primary" onClick={handleSaveNote}>Lưu ghi chú</Button>
+                        </Form>
+                    </TabPane>
+                </Tabs>
+            </Form>
+        </Modal>
 
         {invoiceData && (
             <Modal
