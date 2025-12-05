@@ -148,3 +148,4 @@ const ClinicalServicesPage = () => {
 };
 
 export default ClinicalServicesPage;
+export const dynamic = 'force-dynamic';

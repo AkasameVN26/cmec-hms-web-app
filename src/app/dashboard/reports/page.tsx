@@ -31,3 +31,5 @@ const ReportsPage = () => {
 };
 
 export default ReportsPage;
+
+export const dynamic = 'force-dynamic';

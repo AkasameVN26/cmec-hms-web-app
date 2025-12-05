@@ -324,3 +324,4 @@ const ServiceRequestsPage = () => {
 };
 
 export default ServiceRequestsPage;
+export const dynamic = 'force-dynamic';

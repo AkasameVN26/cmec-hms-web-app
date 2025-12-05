@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, Form, Button, Input, message, Typography } from 'antd';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
@@ -10,8 +10,10 @@ const { Text } = Typography;
 const EditAccountPage = ({ params }: { params: { id: string } }) => {
   const [account, setAccount] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [roles, setRoles] = useState<any[]>([]);
   const router = useRouter();
   const [form] = Form.useForm();
+  const accountId = params.id;
 
     const fetchAccount = useCallback(async () => {
         if (!accountId) return;

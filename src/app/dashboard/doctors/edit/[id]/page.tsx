@@ -105,7 +105,7 @@ const EditDoctorPage = ({ params }: { params: { id: string } }) => {
           <Input />
         </Form.Item>
         <Form.Item name="tien_luong" label="Tiền lương (VND)">
-          <InputNumber 
+          <InputNumber<number>
             min={0} 
             style={{ width: '100%' }} 
             formatter={(value) => value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''} 

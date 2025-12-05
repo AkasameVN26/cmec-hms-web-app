@@ -239,3 +239,5 @@ const InpatientListPage = () => {
 };
 
 export default InpatientListPage;
+
+export const dynamic = 'force-dynamic';

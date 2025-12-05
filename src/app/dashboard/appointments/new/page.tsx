@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react';
 import { Card, Form, Button, Select, DatePicker, Input, message, Row, Col, Modal, Spin } from 'antd';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/providers/AuthProvider';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
 
 const NewAppointmentPage = () => {
+  const { user } = useAuth();
   const [patients, setPatients] = useState<any[]>([]);
   const [doctors, setDoctors] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
@@ -96,16 +98,22 @@ const NewAppointmentPage = () => {
       const doctorIds = shiftData.map(s => s.id_bac_si);
       const { data: doctorsData, error: doctorsError } = await supabase
         .from('bac_si')
-        .select('id_bac_si, ho_ten, chuyen_khoa')
+        .select('id_bac_si, tai_khoan(ho_ten), chuyen_khoa(ten_chuyen_khoa)')
         .in('id_bac_si', doctorIds);
 
       if (doctorsData) {
+        const formattedDoctors = doctorsData.map((d: any) => ({
+            id_bac_si: d.id_bac_si,
+            ho_ten: d.tai_khoan?.ho_ten,
+            chuyen_khoa: d.chuyen_khoa?.ten_chuyen_khoa
+        }));
+
         const getLastName = (fullName: string) => {
-          const parts = fullName.split(' ');
-          return parts[parts.length - 1];
+          const parts = fullName ? fullName.split(' ') : [];
+          return parts.length > 0 ? parts[parts.length - 1] : '';
         };
         
-        const sortedData = doctorsData.sort((a, b) => {
+        const sortedData = formattedDoctors.sort((a: any, b: any) => {
           const lastNameA = getLastName(a.ho_ten);
           const lastNameB = getLastName(b.ho_ten);
           return lastNameA.localeCompare(lastNameB, 'vi', { sensitivity: 'base' });
@@ -121,24 +129,45 @@ const NewAppointmentPage = () => {
 
   const onFinish = async (values: any) => {
     setLoading(true);
-    const { error } = await supabase.from('lich_kham').insert([
-      {
-        id_benh_nhan: values.id_benh_nhan,
-        id_bac_si: values.id_bac_si,
-        id_phong_kham: values.id_phong_kham,
-        thoi_gian_kham: values.thoi_gian_kham.toISOString(),
-        ly_do_kham: values.ly_do_kham,
-        trang_thai: 'Đã Hẹn',
-      },
-    ]);
+    
+    try {
+        // 1. Create Ho So Benh An
+        const { data: hoSo, error: hoSoError } = await supabase
+            .from('ho_so_benh_an')
+            .insert([{
+                id_benh_nhan: values.id_benh_nhan,
+                loai_benh_an: 'Ngoại trú',
+                trang_thai: 'Đang xử lý'
+            }])
+            .select()
+            .single();
+            
+        if (hoSoError) throw new Error('Lỗi tạo hồ sơ bệnh án: ' + hoSoError.message);
 
-    if (error) {
-      message.error(error.message);
-    } else {
-      message.success('Thêm lịch khám thành công');
-      router.push('/dashboard/appointments');
+        // 2. Create Lich Kham
+        const { error } = await supabase.from('lich_kham').insert([
+        {
+            id_benh_nhan: values.id_benh_nhan,
+            id_bac_si_phu_trach: values.id_bac_si,
+            id_phong_kham: values.id_phong_kham,
+            thoi_gian_kham: values.thoi_gian_kham.toISOString(),
+            ly_do_kham: values.ly_do_kham,
+            trang_thai: 'Đã Hẹn',
+            id_ho_so: hoSo.id_ho_so,
+            id_nguoi_dat_lich: user?.id,
+            loai_lich_kham: 'Khám bệnh'
+        },
+        ]);
+
+        if (error) throw error;
+
+        message.success('Thêm lịch khám thành công');
+        router.push('/dashboard/appointments');
+    } catch (err: any) {
+        message.error(err.message);
+    } finally {
+        setLoading(false);
     }
-    setLoading(false);
   };
 
   const onAddPatientFinish = async (values: any) => {
@@ -268,3 +297,4 @@ const NewAppointmentPage = () => {
 };
 
 export default NewAppointmentPage;
+export const dynamic = 'force-dynamic';

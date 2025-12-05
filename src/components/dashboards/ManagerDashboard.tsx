@@ -131,7 +131,7 @@ const ManagerDashboard = () => {
     });
 
     const getOnCallDutyChartOptions = () => {
-        const doctors = [...new Set(onCallDutyChart.map(d => d.doctor_name))];
+        const doctors = Array.from(new Set(onCallDutyChart.map(d => d.doctor_name)));
         const shifts = ['Sáng', 'Chiều', 'Tối'];
         const shiftDurations: { [key: string]: number } = {
             'Sáng': 5,

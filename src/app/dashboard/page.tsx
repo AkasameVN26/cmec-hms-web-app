@@ -24,3 +24,4 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
+export const dynamic = 'force-dynamic';

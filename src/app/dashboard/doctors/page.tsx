@@ -74,7 +74,7 @@ const DoctorsPage = () => {
     const { count } = await supabase
       .from('lich_kham')
       .select('*', { count: 'exact', head: true })
-      .eq('id_bac_si', doctor.id_bac_si);
+      .eq('id_bac_si_phu_trach', doctor.id_bac_si);
     setSelectedDoctorDetails({ ...doctor, appointment_count: count || 0 });
     setIsDetailsModalVisible(true);
     setLoading(false);
@@ -208,3 +208,4 @@ const DoctorsPage = () => {
 };
 
 export default DoctorsPage;
+export const dynamic = 'force-dynamic';

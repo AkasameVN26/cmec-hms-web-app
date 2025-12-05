@@ -53,7 +53,7 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
         setLoading(true);
         const { data, error } = await supabase
             .from('lich_kham')
-            .select('*, bac_si:id_bac_si(tai_khoan!id_bac_si(ho_ten)), phong_kham:id_phong_kham(ten_phong_kham), chan_doan(benh(id_benh, ten_benh)) ')
+            .select('*, bac_si:id_bac_si_phu_trach(tai_khoan!id_bac_si(ho_ten)), phong_kham:id_phong_kham(ten_phong_kham), ho_so_benh_an!id_ho_so(chan_doan(benh(id_benh, ten_benh)))')
             .eq('id_ho_so', record_id)
             .order('thoi_gian_kham', { ascending: false });
         
@@ -129,7 +129,13 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
     const handleEdit = (appointment: any | null) => {
         setEditingAppointment(appointment);
         if (appointment) {
-            editForm.setFieldsValue({ ...appointment, thoi_gian_kham: dayjs(appointment.thoi_gian_kham) });
+            // Map new column name back to form field name (id_bac_si) if needed, or just use id_bac_si_phu_trach
+            // Here we use id_bac_si for the form field for simplicity, but we need to set it from id_bac_si_phu_trach
+            editForm.setFieldsValue({
+                ...appointment,
+                id_bac_si: appointment.id_bac_si_phu_trach,
+                thoi_gian_kham: dayjs(appointment.thoi_gian_kham)
+            });
         } else {
             editForm.resetFields();
         }
@@ -144,10 +150,25 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
     const handleEditOk = async () => {
         try {
             const values = await editForm.validateFields();
-            const submissionData = { ...values, thoi_gian_kham: dayjs(values.thoi_gian_kham).toISOString(), id_ho_so: record_id, id_benh_nhan: patient_id, trang_thai: 'Đã Hẹn' };
+            
+            const submissionData = {
+                id_benh_nhan: patient_id,
+                id_bac_si_phu_trach: values.id_bac_si, // Map from form's id_bac_si
+                id_phong_kham: values.id_phong_kham,
+                ly_do_kham: values.ly_do_kham,
+                chi_phi_kham: values.chi_phi_kham,
+                thoi_gian_kham: dayjs(values.thoi_gian_kham).toISOString(),
+                id_ho_so: record_id,
+                trang_thai: 'Đã Hẹn',
+                id_nguoi_dat_lich: user?.id, // New required field
+                loai_lich_kham: 'Khám bệnh' // Default
+            };
+
             let error;
             if (editingAppointment) {
-                const { error: updateError } = await supabase.from('lich_kham').update(submissionData).eq('id_lich_kham', editingAppointment.id_lich_kham);
+                // For update, we don't strictly need id_nguoi_dat_lich if not changing it, but good to have or exclude
+                const { id_nguoi_dat_lich, ...updateData } = submissionData;
+                const { error: updateError } = await supabase.from('lich_kham').update(updateData).eq('id_lich_kham', editingAppointment.id_lich_kham);
                 error = updateError;
             } else {
                 const { error: insertError } = await supabase.from('lich_kham').insert([submissionData]);
@@ -175,7 +196,7 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
 
     const handleConclude = (appointment: any) => {
         setEditingAppointment(appointment);
-        const diseaseIds = appointment.chan_doan.map((d: any) => d.benh.id_benh);
+        const diseaseIds = appointment.ho_so_benh_an?.chan_doan?.map((d: any) => d.benh.id_benh) || [];
         conclusionForm.setFieldsValue({ ...appointment, benh_ids: diseaseIds, ngay_tai_kham: appointment.ngay_tai_kham ? dayjs(appointment.ngay_tai_kham) : null, prescription: [] });
         setIsConclusionModalVisible(true);
     };
@@ -194,7 +215,10 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
 
     const showAdmissionModal = () => {
         admissionForm.resetFields();
-        admissionForm.setFieldsValue({ id_bac_si_phu_trach: user?.id });
+        const isCurrentUserDoctor = doctors.some(d => d.id_bac_si === user?.id);
+        if (isCurrentUserDoctor) {
+            admissionForm.setFieldsValue({ id_bac_si_phu_trach: user?.id });
+        }
         setIsAdmissionModalVisible(true);
     };
 
@@ -227,7 +251,7 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
         {
             title: 'Hành động',
             key: 'action',
-            fixed: 'right',
+            fixed: 'right' as const,
             width: 220,
             render: (_: any, record: any) => (
                 <Space>
@@ -235,7 +259,7 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
                     {!isRecordCancelled && (
                         <>
                             {(isReceptionist || isAdmin) && record.trang_thai === 'Đã Hẹn' && <Button size="small" onClick={() => handleEdit(record)}>Cập nhật</Button>}
-                            {((can('appointment.result.update.assigned') && record.id_bac_si === user?.id) || can('appointment.update.all')) && record.trang_thai === 'Đã Hẹn' && <Button type="primary" size="small" onClick={() => handleConclude(record)}>Kết luận & Kê đơn</Button>}
+                            {((can('appointment.result.update.assigned') && record.id_bac_si_phu_trach === user?.id) || can('appointment.update.all')) && record.trang_thai === 'Đã Hẹn' && <Button type="primary" size="small" onClick={() => handleConclude(record)}>Kết luận & Kê đơn</Button>}
                         </>
                     )}
                 </Space>
@@ -263,7 +287,7 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
                         <Descriptions.Item label="Phòng khám">{viewingAppointment.phong_kham?.ten_phong_kham}</Descriptions.Item>
                         <Descriptions.Item label="Lý do khám">{viewingAppointment.ly_do_kham}</Descriptions.Item>
                         <Descriptions.Item label="Kết luận">{viewingAppointment.ket_luan || '-'}</Descriptions.Item>
-                        <Descriptions.Item label="Chẩn đoán">{viewingAppointment.chan_doan.map((d:any) => d.benh.ten_benh).join(', ') || '-'}</Descriptions.Item>
+                        <Descriptions.Item label="Chẩn đoán">{viewingAppointment.ho_so_benh_an?.chan_doan?.map((d:any) => d.benh.ten_benh).join(', ') || '-'}</Descriptions.Item>
                         <Descriptions.Item label="Ngày tái khám">{viewingAppointment.ngay_tai_kham ? new Date(viewingAppointment.ngay_tai_kham).toLocaleDateString('vi-VN') : '-'}</Descriptions.Item>
                         <Descriptions.Item label="Chi phí khám">{viewingAppointment.chi_phi_kham ? `${viewingAppointment.chi_phi_kham.toLocaleString('vi-VN')} VND` : '-'}</Descriptions.Item>
                     </Descriptions>
@@ -284,7 +308,7 @@ const LichKhamTab = ({ record_id, patient_id, record_status, record_type }: { re
                         <Select placeholder="Chọn phòng khám">{clinics.map(c => <Option key={c.id_phong_kham} value={c.id_phong_kham}>{c.ten_phong_kham}</Option>)}</Select>
                     </Form.Item>
                     <Form.Item name="chi_phi_kham" label="Chi phí khám (VND)">
-                        <InputNumber style={{ width: '100%' }} placeholder="Nhập chi phí" min={0} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value!.replace(/\$\s?|(,*)/g, '')} />
+                        <InputNumber<number> style={{ width: '100%' }} placeholder="Nhập chi phí" min={0} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value ? parseInt(value.replace(/\$\s?|(,*)/g, '')) : 0} />
                     </Form.Item>
                 </Form>
             </Modal>
@@ -557,7 +581,7 @@ const DonThuocTab = ({ record_id }: { record_id: number }) => {
             .select(`
                 *,
                 lich_kham:id_lich_kham(
-                    bac_si:id_bac_si(
+                    bac_si:id_bac_si_phu_trach(
                         tai_khoan!inner(ho_ten)
                     )
                 ),

@@ -229,13 +229,13 @@ const MedicinesPage = () => {
                     <Input />
                 </Form.Item>
                 <Form.Item name="so_luong_ton_kho" label="Số lượng tồn kho" rules={[{ required: true }]}>
-                    <InputNumber min={0} style={{ width: '100%' }} />
+                    <InputNumber<number> min={0} style={{ width: '100%' }} />
                 </Form.Item>
                 <Form.Item name="don_gia_nhap" label="Đơn giá nhập" rules={[{ required: true }]}>
-                    <InputNumber min={0} style={{ width: '100%' }} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(value) => value!.replace(/\,/g, '')} />
+                    <InputNumber<number> min={0} style={{ width: '100%' }} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(value) => value ? Number(value.replace(/\,/g, '')) : 0} />
                 </Form.Item>
                 <Form.Item name="don_gia_ban" label="Đơn giá bán" rules={[{ required: true }]}>
-                    <InputNumber min={0} style={{ width: '100%' }} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(value) => value!.replace(/\,/g, '')} />
+                    <InputNumber<number> min={0} style={{ width: '100%' }} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(value) => value ? Number(value.replace(/\,/g, '')) : 0} />
                 </Form.Item>
                 <Form.Item name="mo_ta" label="Mô tả">
                     <Input.TextArea rows={3} />
@@ -248,3 +248,5 @@ const MedicinesPage = () => {
 };
 
 export default MedicinesPage;
+
+export const dynamic = 'force-dynamic';

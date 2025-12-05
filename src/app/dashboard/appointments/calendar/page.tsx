@@ -11,11 +11,13 @@ import { EventClickArg, EventSourceInput } from '@fullcalendar/core';
 import dayjs from 'dayjs';
 import NProgress from 'nprogress';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useAuth } from '@/providers/AuthProvider';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
 
 const AppointmentCalendarPage = () => {
+    const { user } = useAuth();
     const router = useRouter();
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
@@ -158,11 +160,13 @@ const AppointmentCalendarPage = () => {
             const submissionData = {
                 id_benh_nhan: values.id_benh_nhan,
                 id_ho_so: values.id_ho_so,
-                id_bac_si: values.id_bac_si,
+                id_bac_si_phu_trach: values.id_bac_si,
                 id_phong_kham: values.id_phong_kham,
                 ly_do_kham: values.ly_do_kham,
                 thoi_gian_kham: dayjs(values.thoi_gian_kham).toISOString(),
-                trang_thai: 'Đã Hẹn'
+                trang_thai: 'Đã Hẹn',
+                id_nguoi_dat_lich: user?.id,
+                loai_lich_kham: 'Tái khám' // Default for calendar quick add? Or Khám bệnh? Assuming Re-visit or standard
             };
 
             const { error } = await supabase.from('lich_kham').insert([submissionData]);
@@ -171,8 +175,9 @@ const AppointmentCalendarPage = () => {
             message.success('Tạo lịch hẹn mới thành công!');
             setIsModalVisible(false);
             calendarRef.current?.getApi().refetchEvents();
-        } catch (info) {
+        } catch (info: any) {
             console.log('Validate Failed:', info);
+            if (info.message) message.error(info.message);
         }
     };
 
@@ -278,3 +283,4 @@ const AppointmentCalendarPage = () => {
 };
 
 export default AppointmentCalendarPage;
+export const dynamic = 'force-dynamic';

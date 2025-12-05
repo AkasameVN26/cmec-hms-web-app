@@ -56,7 +56,7 @@ const RoomsPage = () => {
     if (error) {
       message.error(`Lỗi khi tải dữ liệu phòng bệnh: ${error.message}`);
     } else {
-      setRooms(data || []);
+      setRooms((data as unknown as Room[]) || []);
     }
     setLoading(false);
   };
@@ -148,7 +148,7 @@ const RoomsPage = () => {
       title: 'Khu Điều Trị',
       dataIndex: 'khu_dieu_tri',
       key: 'khu_dieu_tri',
-      render: (khu_dieu_tri) => khu_dieu_tri ? khu_dieu_tri.ten_khu : '-',
+      render: (khu_dieu_tri: any) => khu_dieu_tri ? khu_dieu_tri.ten_khu : '-',
     },
     {
         title: 'Chi Phí Vận Hành',
@@ -237,7 +237,7 @@ const RoomsPage = () => {
                     label="Chi Phí Vận Hành (VNĐ)"
                     rules={[{ required: true, message: 'Vui lòng nhập chi phí vận hành!' }]}
                 >
-                    <InputNumber style={{ width: '100%' }} min={0} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
+                    <InputNumber<number> style={{ width: '100%' }} min={0} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
                 </Form.Item>
             </Form>
         </Modal>
@@ -246,3 +246,5 @@ const RoomsPage = () => {
 };
 
 export default RoomsPage;
+
+export const dynamic = 'force-dynamic';

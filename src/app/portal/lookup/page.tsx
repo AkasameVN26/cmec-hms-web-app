@@ -173,7 +173,7 @@ const PatientPortalLookupPage = () => {
                             rowKey="id_don_thuoc"
                             pagination={{ pageSize: 5 }}
                             expandable={{
-                                expandedRowRender: record => (
+                                expandedRowRender: (record: any) => (
                                     <Table columns={prescriptionDetailColumns} dataSource={record.medicines} rowKey="ten_thuoc" pagination={false} />
                                 ),
                             }}
@@ -224,3 +224,4 @@ const PatientPortalLookupPage = () => {
 };
 
 export default PatientPortalLookupPage;
+export const dynamic = 'force-dynamic';

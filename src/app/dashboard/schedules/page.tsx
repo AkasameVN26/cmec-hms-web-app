@@ -207,3 +207,5 @@ const SchedulesPage = () => {
 };
 
 export default SchedulesPage;
+
+export const dynamic = 'force-dynamic';

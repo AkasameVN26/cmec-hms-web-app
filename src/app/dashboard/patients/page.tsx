@@ -253,3 +253,5 @@ const PatientsPage = () => {
 };
 
 export default PatientsPage;
+
+export const dynamic = 'force-dynamic';

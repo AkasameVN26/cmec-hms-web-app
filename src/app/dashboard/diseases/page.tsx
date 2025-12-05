@@ -191,3 +191,5 @@ const DiseasesPage = () => {
 };
 
 export default DiseasesPage;
+
+export const dynamic = 'force-dynamic';

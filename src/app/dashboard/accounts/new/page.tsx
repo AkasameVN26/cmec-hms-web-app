@@ -151,7 +151,7 @@ const NewAccountPage = () => {
                             <Input.TextArea rows={2} />
                         </Form.Item>
                         <Form.Item name={['doctorDetails', 'tien_luong']} label="Tiền lương (VND)">
-                            <InputNumber style={{ width: '100%' }} min={0} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')} parser={(value) => value ? parseInt(value.replace(/\./g, '')) : 0} />
+                            <InputNumber<number> style={{ width: '100%' }} min={0} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')} parser={(value) => value ? parseInt(value.replace(/\./g, '')) : 0} />
                         </Form.Item>
                         <Form.Item name={['doctorDetails', 'ngay_chuyen_den']} label="Ngày chuyển đến" rules={[{ required: true, message: 'Vui lòng nhập ngày chuyển đến' }]}>
                             <DatePicker style={{ width: '100%' }}/>
@@ -181,7 +181,7 @@ const NewAccountPage = () => {
                             <Input placeholder="VD: Cử nhân, Kỹ sư..."/>
                         </Form.Item>
                         <Form.Item name={['technicianDetails', 'tien_luong']} label="Tiền lương (VND)">
-                            <InputNumber style={{ width: '100%' }} min={0} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')} parser={(value) => value ? parseInt(value.replace(/\./g, '')) : 0} />
+                            <InputNumber<number> style={{ width: '100%' }} min={0} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')} parser={(value) => value ? parseInt(value.replace(/\./g, '')) : 0} />
                         </Form.Item>
                         <Form.Item name={['technicianDetails', 'ngay_chuyen_den']} label="Ngày chuyển đến" rules={[{ required: true, message: 'Vui lòng nhập ngày chuyển đến' }]}>
                             <DatePicker style={{ width: '100%' }}/>
@@ -209,3 +209,5 @@ const NewAccountPage = () => {
 };
 
 export default NewAccountPage;
+
+export const dynamic = 'force-dynamic';

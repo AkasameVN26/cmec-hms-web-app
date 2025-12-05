@@ -122,3 +122,4 @@ const ServiceResultsPage = () => {
 };
 
 export default ServiceResultsPage;
+export const dynamic = 'force-dynamic';

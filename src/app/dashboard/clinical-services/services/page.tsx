@@ -120,7 +120,7 @@ const ClinicalServicesManagementPage = () => {
   };
 
   const columns = [
-    { title: 'Tên dịch vụ', dataIndex: 'ten_dich_vu', key: 'ten_dich_vu', fixed: 'left', width: 250 },
+    { title: 'Tên dịch vụ', dataIndex: 'ten_dich_vu', key: 'ten_dich_vu', fixed: 'left' as const, width: 250 },
     { title: 'Chuyên khoa', dataIndex: ['chuyen_khoa', 'ten_chuyen_khoa'], key: 'chuyen_khoa', width: 200 },
     { title: 'Phòng thực hiện', dataIndex: ['phong_kham', 'ten_phong_kham'], key: 'phong_kham', width: 200 },
     {
@@ -129,14 +129,14 @@ const ClinicalServicesManagementPage = () => {
         key: 'don_gia',
         width: 150,
         render: (val: number) => val ? val.toLocaleString('vi-VN') + ' VND' : 'N/A',
-        sorter: (a, b) => a.don_gia - b.don_gia,
-        sortOrder: sortOrder ? (sortOrder === 'asc' ? 'ascend' : 'descend') : false,
+        sorter: (a: any, b: any) => a.don_gia - b.don_gia,
+        sortOrder: sortOrder ? (sortOrder === 'asc' ? 'ascend' : 'descend') : null as 'ascend' | 'descend' | null,
     },
     { title: 'Mô tả', dataIndex: 'mo_ta', key: 'mo_ta', ellipsis: true },
     {
       title: 'Hành động',
       key: 'action',
-      fixed: 'right',
+      fixed: 'right' as const,
       width: 150,
       render: (_: any, record: any) => (
         <Space size="middle">
@@ -231,7 +231,7 @@ const ClinicalServicesManagementPage = () => {
             </Select>
           </Form.Item>
           <Form.Item name="don_gia" label="Đơn giá" rules={[{ required: true }]}>
-            <InputNumber min={0} style={{ width: '100%' }} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(value) => Number(value!.replace(/\D/g, ''))} />
+            <InputNumber<number> min={0} style={{ width: '100%' }} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(value) => Number(value!.replace(/\D/g, ''))} />
           </Form.Item>
           <Form.Item name="mo_ta" label="Mô tả">
             <Input.TextArea rows={3} />
@@ -243,3 +243,5 @@ const ClinicalServicesManagementPage = () => {
 };
 
 export default ClinicalServicesManagementPage;
+
+export const dynamic = 'force-dynamic';

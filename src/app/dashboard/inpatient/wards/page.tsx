@@ -54,7 +54,7 @@ const WardsPage = () => {
     if (error) {
       message.error(`Lỗi khi tải dữ liệu khu điều trị: ${error.message}`);
     } else {
-      setWards(data || []);
+      setWards((data as unknown as Ward[]) || []);
     }
     setLoading(false);
   };
@@ -149,7 +149,7 @@ const WardsPage = () => {
       title: 'Chuyên Khoa',
       dataIndex: 'chuyen_khoa',
       key: 'chuyen_khoa',
-      render: (chuyen_khoa) => chuyen_khoa ? chuyen_khoa.ten_chuyen_khoa : '-',
+      render: (chuyen_khoa: any) => chuyen_khoa ? chuyen_khoa.ten_chuyen_khoa : '-',
     },
     {
       title: 'Hành Động',
@@ -232,3 +232,5 @@ const WardsPage = () => {
 };
 
 export default WardsPage;
+
+export const dynamic = 'force-dynamic';

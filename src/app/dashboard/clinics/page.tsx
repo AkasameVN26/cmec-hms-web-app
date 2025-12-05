@@ -123,7 +123,7 @@ const ClinicsPage = () => {
             <Input />
           </Form.Item>
           <Form.Item name="chi_phi_van_hanh" label="Chi phí vận hành (VND/tháng)" rules={[{ required: true }]}>
-            <InputNumber style={{ width: '100%' }} min={0} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')} parser={(value) => value ? parseInt(value.replace(/\./g, '')) : 0} />
+            <InputNumber<number> style={{ width: '100%' }} min={0} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')} parser={(value) => value ? parseInt(value.replace(/\./g, '')) : 0} />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit">
@@ -137,3 +137,4 @@ const ClinicsPage = () => {
 };
 
 export default ClinicsPage;
+export const dynamic = 'force-dynamic';

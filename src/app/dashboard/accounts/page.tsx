@@ -232,3 +232,4 @@ const AccountsListPage = () => {
 };
 
 export default AccountsListPage;
+export const dynamic = 'force-dynamic';

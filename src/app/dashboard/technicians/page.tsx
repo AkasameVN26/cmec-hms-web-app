@@ -175,3 +175,4 @@ const TechniciansPage = () => {
 };
 
 export default TechniciansPage;
+export const dynamic = 'force-dynamic';

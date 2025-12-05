@@ -182,3 +182,5 @@ const LandingPage = () => {
 };
 
 export default LandingPage;
+
+export const dynamic = 'force-dynamic';

@@ -23,7 +23,7 @@ const PrescriptionsPage = () => {
             *,
             lich_kham:id_lich_kham (
                 benh_nhan:id_benh_nhan ( ho_ten ),
-                bac_si:id_bac_si (
+                bac_si:id_bac_si_phu_trach (
                     tai_khoan!inner(ho_ten)
                 )
             ),
@@ -147,3 +147,5 @@ const PrescriptionsPage = () => {
 };
 
 export default PrescriptionsPage;
+
+export const dynamic = 'force-dynamic';

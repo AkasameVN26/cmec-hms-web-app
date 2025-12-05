@@ -57,3 +57,5 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
+
+export const dynamic = 'force-dynamic';

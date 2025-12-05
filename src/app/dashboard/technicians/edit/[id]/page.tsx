@@ -152,7 +152,7 @@ const EditTechnicianPage = ({ params }: { params: { id: string } }) => {
                     <Input placeholder="VD: Cử nhân, Kỹ sư..."/>
                 </Form.Item>
                 <Form.Item name="tien_luong" label="Tiền lương (VND)">
-                    <InputNumber style={{ width: '100%' }} min={0} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')} parser={(value) => value ? parseInt(value.replace(/\./g, '')) : 0} />
+                    <InputNumber<number> style={{ width: '100%' }} min={0} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')} parser={(value) => value ? parseInt(value.replace(/\./g, '')) : 0} />
                 </Form.Item>
                 <Form.Item name="ngay_chuyen_den" label="Ngày chuyển đến" rules={[{ required: true }]}>
                     <DatePicker style={{ width: '100%' }}/>

@@ -188,3 +188,4 @@ const MedicalRecordsWorklistPage = () => {
 };
 
 export default MedicalRecordsWorklistPage;
+export const dynamic = 'force-dynamic';

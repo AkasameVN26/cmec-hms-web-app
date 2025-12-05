@@ -62,7 +62,7 @@ const BedsPage = () => {
     if (error) {
       message.error(`Lỗi khi tải dữ liệu giường bệnh: ${error.message}`);
     } else {
-      setBeds(data || []);
+      setBeds((data as unknown as Bed[]) || []);
     }
     setLoading(false);
   };
@@ -155,13 +155,13 @@ const BedsPage = () => {
         title: 'Phòng Bệnh',
         dataIndex: 'phong_benh',
         key: 'phong_benh',
-        render: (phong_benh) => phong_benh ? phong_benh.ten_phong : '-',
+        render: (phong_benh: any) => phong_benh ? phong_benh.ten_phong : '-',
     },
     {
         title: 'Khu Điều Trị',
         dataIndex: 'phong_benh',
         key: 'khu_dieu_tri',
-        render: (phong_benh) => phong_benh?.khu_dieu_tri ? phong_benh.khu_dieu_tri.ten_khu : '-',
+        render: (phong_benh: any) => phong_benh?.khu_dieu_tri ? phong_benh.khu_dieu_tri.ten_khu : '-',
     },
     {
       title: 'Trạng Thái',
@@ -267,3 +267,5 @@ const BedsPage = () => {
 };
 
 export default BedsPage;
+
+export const dynamic = 'force-dynamic';

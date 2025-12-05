@@ -12,6 +12,8 @@ export const metadata: Metadata = {
   description: "Giao diện quản lý cho hệ thống bệnh viện CMEC",
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function RootLayout({
   children,
 }: Readonly<{

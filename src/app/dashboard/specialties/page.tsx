@@ -130,3 +130,5 @@ const SpecialtyPage = () => {
 };
 
 export default SpecialtyPage;
+
+export const dynamic = 'force-dynamic';
