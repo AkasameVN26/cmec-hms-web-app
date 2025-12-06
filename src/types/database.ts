@@ -69,6 +69,11 @@ export interface Database {
         Insert: Omit<LoaiGhiChu, 'id_loai_ghi_chu'> & { id_loai_ghi_chu?: number }
         Update: Partial<LoaiGhiChu>
       }
+      luot_dieu_tri_noi_tru: {
+        Row: LuotDieuTriNoiTru
+        Insert: Omit<LuotDieuTriNoiTru, 'id_luot_dieu_tri'> & { id_luot_dieu_tri?: number }
+        Update: Partial<LuotDieuTriNoiTru>
+      }
       ho_so_benh_an: {
         Row: HoSoBenhAn
         Insert: Omit<HoSoBenhAn, 'id_ho_so' | 'thoi_gian_mo_ho_so'> & { id_ho_so?: number; thoi_gian_mo_ho_so?: string }
@@ -180,6 +185,7 @@ export interface GhiChuYTe {
   id_ghi_chu: number
   id_loai_ghi_chu: number
   id_ho_so: number
+  id_lich_kham: number | null
   id_nguoi_tao: string
   thoi_gian_tao: string
   noi_dung_ghi_chu: string | null
@@ -247,6 +253,16 @@ export interface BenhVien {
   email: string
   website: string
   ngay_thanh_lap: string
+}
+
+export interface LuotDieuTriNoiTru {
+  id_luot_dieu_tri: number
+  ngay_nhap_vien: string
+  id_giuong_benh: number | null
+  ngay_xuat_vien: string | null
+  trang_thai_dieu_tri: 'Đang điều trị' | 'Đã xuất viện' | 'Chuyển viện'
+  id_bac_si_phu_trach: string
+  id_ho_so: number
 }
 
 export interface TaiKhoan {

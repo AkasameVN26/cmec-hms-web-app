@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, message, Spin, Descriptions, Button, Tag, Tabs, Row, Col, Typography, Table, Space, Modal, Form, DatePicker, Select, Input, InputNumber, Image, List, Divider, Alert } from 'antd';
-import { MinusCircleOutlined, PlusOutlined, EditOutlined } from '@ant-design/icons';
+import { MinusCircleOutlined, PlusOutlined, EditOutlined, ArrowLeftOutlined, DeleteOutlined } from '@ant-design/icons';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
@@ -202,14 +202,29 @@ const LichKhamTab = ({
     const handleAdmissionOk = async () => {
         try {
             const values = await admissionForm.validateFields();
+
+            // 1. Get Note Type ID
+            const { data: noteType } = await supabase.from('loai_ghi_chu').select('id_loai_ghi_chu').eq('ten_loai_ghi_chu', 'Chẩn đoán nhập viện').single();
+            if (!noteType) throw new Error('Không tìm thấy loại ghi chú "Chẩn đoán nhập viện". Vui lòng liên hệ quản trị viên.');
+
+            // 2. Call RPC to admit patient (Parameter p_chan_doan removed as per new DB design)
             const { error } = await supabase.rpc('admit_patient_to_inpatient', {
                 p_ho_so_id: record_id,
-                p_chan_doan: values.chan_doan_nhap_vien,
                 p_bac_si_id: values.id_bac_si_phu_trach,
                 p_ngay_nhap_vien: new Date().toISOString()
             });
 
             if (error) throw error;
+
+            // 3. Create Medical Note for Admission Diagnosis
+            const { error: noteError } = await supabase.from('ghi_chu_y_te').insert({
+                id_ho_so: record_id,
+                id_loai_ghi_chu: noteType.id_loai_ghi_chu,
+                id_nguoi_tao: user?.id,
+                noi_dung_ghi_chu: values.chan_doan_nhap_vien
+            });
+
+            if (noteError) throw noteError;
 
             message.success('Tạo lệnh nhập viện thành công! Bệnh án đã được chuyển thành hồ sơ nội trú.');
             setIsAdmissionModalVisible(false);
@@ -586,6 +601,8 @@ const DonThuocTab = ({ record_id }: { record_id: number }) => {
 const InpatientTreatmentTab = ({ record_id, record_status }: { record_id: number, record_status: string }) => {
     const { user, can } = useAuth();
     const [treatmentRecord, setTreatmentRecord] = useState<any | null>(null);
+    const [admissionDiagnosis, setAdmissionDiagnosis] = useState<string>('');
+    const [dischargeDiagnosis, setDischargeDiagnosis] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [isNoteModalVisible, setIsNoteModalVisible] = useState(false);
     const [isNoteDetailModalVisible, setIsNoteDetailModalVisible] = useState(false);
@@ -597,6 +614,8 @@ const InpatientTreatmentTab = ({ record_id, record_status }: { record_id: number
 
     const fetchInpatientRecord = useCallback(async () => {
         setLoading(true);
+        
+        // Fetch Treatment Record
         const { data, error } = await supabase
             .from('luot_dieu_tri_noi_tru')
             .select(`
@@ -612,11 +631,26 @@ const InpatientTreatmentTab = ({ record_id, record_status }: { record_id: number
             .order('thoi_gian_tao', { foreignTable: 'phieu_theo_doi_noi_tru', ascending: false })
             .single();
         
-        if (error && error.code !== 'PGRST116') { // PGRST116: 0 rows
+        if (error && error.code !== 'PGRST116') {
             message.error("Lỗi khi tải thông tin điều trị nội trú: " + error.message);
         } else {
             setTreatmentRecord(data);
         }
+
+        // Fetch Diagnoses from Notes
+        const { data: notes } = await supabase
+            .from('ghi_chu_y_te')
+            .select('noi_dung_ghi_chu, loai_ghi_chu!inner(ten_loai_ghi_chu)')
+            .eq('id_ho_so', record_id)
+            .in('loai_ghi_chu.ten_loai_ghi_chu', ['Chẩn đoán nhập viện', 'Chẩn đoán xuất viện']);
+        
+        if (notes) {
+            const adminDiag = notes.find((n: any) => n.loai_ghi_chu.ten_loai_ghi_chu === 'Chẩn đoán nhập viện');
+            const dischDiag = notes.find((n: any) => n.loai_ghi_chu.ten_loai_ghi_chu === 'Chẩn đoán xuất viện');
+            if (adminDiag) setAdmissionDiagnosis(adminDiag.noi_dung_ghi_chu);
+            if (dischDiag) setDischargeDiagnosis(dischDiag.noi_dung_ghi_chu);
+        }
+
         setLoading(false);
     }, [record_id]);
 
@@ -660,12 +694,27 @@ const InpatientTreatmentTab = ({ record_id, record_status }: { record_id: number
     const handleDischargeOk = async () => {
         try {
             const values = await dischargeForm.validateFields();
+            
+            // 1. Get Note Type ID
+            const { data: noteType } = await supabase.from('loai_ghi_chu').select('id_loai_ghi_chu').eq('ten_loai_ghi_chu', 'Chẩn đoán xuất viện').single();
+            if (!noteType) throw new Error('Không tìm thấy loại ghi chú "Chẩn đoán xuất viện".');
+
+            // 2. Call RPC (Parameter p_discharge_diagnosis removed)
             const { error } = await supabase.rpc('discharge_patient', {
                 p_treatment_id: treatmentRecord.id_luot_dieu_tri,
-                p_discharge_diagnosis: values.chan_doan_xuat_vien,
                 p_discharge_date: values.ngay_xuat_vien.toISOString()
             });
             if (error) throw error;
+
+            // 3. Create Note
+            const { error: noteError } = await supabase.from('ghi_chu_y_te').insert({
+                id_ho_so: record_id,
+                id_loai_ghi_chu: noteType.id_loai_ghi_chu,
+                id_nguoi_tao: user?.id,
+                noi_dung_ghi_chu: values.chan_doan_xuat_vien
+            });
+            if (noteError) throw noteError;
+
             message.success('Đã tạo lệnh xuất viện thành công!');
             setIsDischargeModalVisible(false);
             fetchInpatientRecord();
@@ -703,7 +752,7 @@ const InpatientTreatmentTab = ({ record_id, record_status }: { record_id: number
             <Descriptions bordered size="small" column={2} style={{ marginBottom: 24 }}>
                 <Descriptions.Item label="Ngày nhập viện">{new Date(treatmentRecord.ngay_nhap_vien).toLocaleString('vi-VN')}</Descriptions.Item>
                 <Descriptions.Item label="Bác sĩ phụ trách">{treatmentRecord.bac_si.tai_khoan.ho_ten}</Descriptions.Item>
-                <Descriptions.Item label="Chẩn đoán nhập viện" span={2}>{treatmentRecord.chan_doan_nhap_vien}</Descriptions.Item>
+                <Descriptions.Item label="Chẩn đoán nhập viện" span={2}>{admissionDiagnosis || <Text type="secondary" italic>(Chưa cập nhật)</Text>}</Descriptions.Item>
                 <Descriptions.Item label="Vị trí">{location}</Descriptions.Item>
                 <Descriptions.Item label="Trạng thái điều trị">
                     <Tag color={isDischarged ? "success" : "blue"}>{treatmentRecord.trang_thai_dieu_tri}</Tag>
@@ -711,7 +760,7 @@ const InpatientTreatmentTab = ({ record_id, record_status }: { record_id: number
                 {isDischarged && (
                     <>
                         <Descriptions.Item label="Ngày xuất viện">{new Date(treatmentRecord.ngay_xuat_vien).toLocaleString('vi-VN')}</Descriptions.Item>
-                        <Descriptions.Item label="Chẩn đoán xuất viện">{treatmentRecord.chan_doan_xuat_vien}</Descriptions.Item>
+                        <Descriptions.Item label="Chẩn đoán xuất viện">{dischargeDiagnosis || <Text type="secondary" italic>(Chưa cập nhật)</Text>}</Descriptions.Item>
                     </>
                 )}
             </Descriptions>
@@ -797,9 +846,47 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
   const [noteForm] = Form.useForm(); // Form for Notes
   const [updatingDiagnosis, setUpdatingDiagnosis] = useState(false);
   const [medicines, setMedicines] = useState<any[]>([]);
+  
+  // Note Management State
+  const [notesList, setNotesList] = useState<any[]>([]);
+  const [noteViewMode, setNoteViewMode] = useState<'list' | 'create'>('list');
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [editingNote, setEditingNote] = useState<any | null>(null);
+  
+  // Note Detail Modal State
+  const [viewingMedicalNote, setViewingMedicalNote] = useState<any | null>(null);
+  const [isMedicalNoteDetailModalVisible, setIsMedicalNoteDetailModalVisible] = useState(false);
 
   const router = useRouter();
   const { can, user } = useAuth();
+
+  const fetchNotes = useCallback(async () => {
+      if (!record?.id_ho_so) return;
+      setLoadingNotes(true);
+      
+      let query = supabase
+          .from('ghi_chu_y_te')
+          .select(`
+              *,
+              loai_ghi_chu:id_loai_ghi_chu(ten_loai_ghi_chu),
+              nguoi_tao:id_nguoi_tao(ho_ten)
+          `)
+          .eq('id_ho_so', record.id_ho_so)
+          .order('thoi_gian_tao', { ascending: false });
+
+      if (editingAppointment?.id_lich_kham) {
+          query = query.eq('id_lich_kham', editingAppointment.id_lich_kham);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+          message.error('Lỗi tải ghi chú: ' + error.message);
+      } else {
+          setNotesList(data || []);
+      }
+      setLoadingNotes(false);
+  }, [record?.id_ho_so, editingAppointment?.id_lich_kham]);
 
   const classifiedDiagnoses = useMemo(() => {
       if (!record?.chan_doan) return { main: [], others: [] };
@@ -910,6 +997,8 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
           diagnoses: currentDiagnoses, // Fill the diagnosis list
           prescription: [] 
       });
+      setNoteViewMode('list');
+      fetchNotes();
       setIsConclusionModalVisible(true);
   };
 
@@ -938,7 +1027,7 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
             const cleanedPrescription = (values.prescription || []).filter((p: any) => p && p.id_thuoc && p.so_luong && p.lieu_dung);
             const { error } = await supabase.rpc('submit_conclusion_and_prescription', { 
                 p_lich_kham_id: editingAppointment.id_lich_kham, 
-                p_ket_luan: values.ket_luan, 
+                p_ket_luan: '', // Removed from form, pass empty string as it's now a medical note
                 p_benh_ids: [], // We handled diagnosis manually above
                 p_medicines: cleanedPrescription, 
                 p_ngay_tai_kham: values.ngay_tai_kham ? dayjs(values.ngay_tai_kham).format('YYYY-MM-DD') : null 
@@ -967,21 +1056,61 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
               }
           }
 
-          const { error } = await supabase.from('ghi_chu_y_te').insert({
+          const noteData = {
               id_ho_so: record.id_ho_so,
+              id_lich_kham: editingAppointment?.id_lich_kham || null,
               id_loai_ghi_chu: values.id_loai_ghi_chu,
               id_nguoi_tao: user?.id,
               noi_dung_ghi_chu: values.noi_dung_ghi_chu,
               du_lieu_cau_truc: values.du_lieu_cau_truc ? JSON.parse(values.du_lieu_cau_truc) : null
-          });
+          };
 
-          if (error) throw error;
+          if (editingNote) {
+              const { error } = await supabase.from('ghi_chu_y_te').update(noteData).eq('id_ghi_chu', editingNote.id_ghi_chu);
+              if (error) throw error;
+              message.success('Cập nhật ghi chú thành công');
+          } else {
+              const { error } = await supabase.from('ghi_chu_y_te').insert(noteData);
+              if (error) throw error;
+              message.success('Đã lưu ghi chú y tế.');
+          }
 
-          message.success('Đã lưu ghi chú y tế.');
           noteForm.resetFields();
+          setEditingNote(null);
+          fetchNotes();
+          setNoteViewMode('list');
       } catch (err: any) {
           message.error('Lỗi lưu ghi chú: ' + err.message);
       }
+  };
+
+  const handleDeleteNote = (note: any) => {
+      Modal.confirm({
+          title: 'Xóa ghi chú',
+          content: 'Bạn có chắc chắn muốn xóa ghi chú này không?',
+          okText: 'Xóa',
+          okType: 'danger',
+          cancelText: 'Hủy',
+          onOk: async () => {
+              const { error } = await supabase.from('ghi_chu_y_te').delete().eq('id_ghi_chu', note.id_ghi_chu);
+              if (error) {
+                  message.error('Lỗi khi xóa: ' + error.message);
+              } else {
+                  message.success('Đã xóa ghi chú');
+                  fetchNotes();
+              }
+          }
+      });
+  };
+
+  const handleEditNote = (note: any) => {
+      setEditingNote(note);
+      noteForm.setFieldsValue({
+          id_loai_ghi_chu: note.id_loai_ghi_chu,
+          noi_dung_ghi_chu: note.noi_dung_ghi_chu,
+          du_lieu_cau_truc: note.du_lieu_cau_truc ? JSON.stringify(note.du_lieu_cau_truc, null, 2) : ''
+      });
+      setNoteViewMode('create');
   };
 
   const handleShowInvoice = async () => {
@@ -1229,20 +1358,97 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
             <Form form={conclusionForm} layout="vertical">
                 <Tabs defaultActiveKey="1">
                     <TabPane tab="Ghi chép y tế" key="1">
-                        <Form form={noteForm} layout="vertical" onFinish={handleSaveNote}>
-                            <Form.Item name="id_loai_ghi_chu" label="Loại ghi chú" rules={[{ required: true, message: 'Vui lòng chọn loại ghi chú' }]}>
-                                <Select placeholder="Chọn loại ghi chú (Diễn biến, Y lệnh...)">
-                                    {noteTypes.map(nt => <Option key={nt.id_loai_ghi_chu} value={nt.id_loai_ghi_chu}>{nt.ten_loai_ghi_chu}</Option>)}
-                                </Select>
-                            </Form.Item>
-                            <Form.Item name="noi_dung_ghi_chu" label="Nội dung ghi chú" rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}>
-                                <Input.TextArea rows={6} placeholder="Nhập nội dung chi tiết..." />
-                            </Form.Item>
-                            <Form.Item name="du_lieu_cau_truc" label="Dữ liệu cấu trúc (JSON)" tooltip="Dành cho các dữ liệu có định dạng đặc biệt">
-                                <Input.TextArea rows={4} placeholder='{"key": "value"}' style={{ fontFamily: 'monospace' }} />
-                            </Form.Item>
-                            <Button type="primary" onClick={handleSaveNote}>Lưu ghi chú</Button>
-                        </Form>
+                        {noteViewMode === 'list' ? (
+                            <>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                                    <Text strong>Danh sách ghi chú</Text>
+                                    <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingNote(null); noteForm.resetFields(); setNoteViewMode('create'); }}>
+                                        Thêm ghi chú
+                                    </Button>
+                                </div>
+                                <Table
+                                    dataSource={notesList}
+                                    rowKey="id_ghi_chu"
+                                    size="small"
+                                    loading={loadingNotes}
+                                    pagination={{ pageSize: 5 }}
+                                    onRow={(record) => ({
+                                        onClick: () => {
+                                            setViewingMedicalNote(record);
+                                            setIsMedicalNoteDetailModalVisible(true);
+                                        },
+                                        style: { cursor: 'pointer' }
+                                    })}
+                                    columns={[
+                                        { title: 'Thời gian', dataIndex: 'thoi_gian_tao', key: 'time', render: (t: string) => new Date(t).toLocaleString('vi-VN'), width: 150 },
+                                        { title: 'Loại', dataIndex: ['loai_ghi_chu', 'ten_loai_ghi_chu'], key: 'type', width: 120, render: (t) => <Tag>{t}</Tag> },
+                                        { title: 'Nội dung', dataIndex: 'noi_dung_ghi_chu', key: 'content', ellipsis: true },
+                                        { title: 'Người tạo', dataIndex: ['nguoi_tao', 'ho_ten'], key: 'creator', width: 150 },
+                                        {
+                                            title: 'Hành động',
+                                            key: 'action',
+                                            width: 100,
+                                            render: (_: any, record: any) => (
+                                                <Space onClick={(e) => e.stopPropagation()}>
+                                                    <Button size="small" icon={<EditOutlined />} onClick={() => handleEditNote(record)} />
+                                                    <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteNote(record)} />
+                                                </Space>
+                                            )
+                                        }
+                                    ]}
+                                />
+                                
+                                <Modal
+                                    title="Chi tiết Ghi chú Y tế"
+                                    open={isMedicalNoteDetailModalVisible}
+                                    onCancel={() => setIsMedicalNoteDetailModalVisible(false)}
+                                    footer={[<Button key="close" onClick={() => setIsMedicalNoteDetailModalVisible(false)}>Đóng</Button>]}
+                                >
+                                    {viewingMedicalNote && (
+                                        <Descriptions column={1} bordered size="small">
+                                            <Descriptions.Item label="Thời gian">{new Date(viewingMedicalNote.thoi_gian_tao).toLocaleString('vi-VN')}</Descriptions.Item>
+                                            <Descriptions.Item label="Loại ghi chú"><Tag>{viewingMedicalNote.loai_ghi_chu?.ten_loai_ghi_chu}</Tag></Descriptions.Item>
+                                            <Descriptions.Item label="Người tạo">{viewingMedicalNote.nguoi_tao?.ho_ten}</Descriptions.Item>
+                                            <Descriptions.Item label="Nội dung">
+                                                <div style={{ whiteSpace: 'pre-wrap' }}>{viewingMedicalNote.noi_dung_ghi_chu}</div>
+                                            </Descriptions.Item>
+                                            {viewingMedicalNote.du_lieu_cau_truc && (
+                                                <Descriptions.Item label="Dữ liệu cấu trúc">
+                                                    <pre style={{ maxHeight: 200, overflow: 'auto' }}>
+                                                        {JSON.stringify(viewingMedicalNote.du_lieu_cau_truc, null, 2)}
+                                                    </pre>
+                                                </Descriptions.Item>
+                                            )}
+                                        </Descriptions>
+                                    )}
+                                </Modal>
+                            </>
+                        ) : (
+                            <>
+                                <Button 
+                                    icon={<ArrowLeftOutlined />} 
+                                    onClick={() => { setEditingNote(null); setNoteViewMode('list'); }} 
+                                    style={{ marginBottom: 16 }}
+                                >
+                                    Quay lại danh sách
+                                </Button>
+                                <Title level={5}>{editingNote ? 'Cập nhật ghi chú' : 'Thêm ghi chú mới'}</Title>
+                                <Form form={noteForm} layout="vertical" onFinish={handleSaveNote}>
+                                    <Form.Item name="id_loai_ghi_chu" label="Loại ghi chú" rules={[{ required: true, message: 'Vui lòng chọn loại ghi chú' }]}>
+                                        <Select placeholder="Chọn loại ghi chú (Diễn biến, Y lệnh...)">
+                                            {noteTypes.map(nt => <Option key={nt.id_loai_ghi_chu} value={nt.id_loai_ghi_chu}>{nt.ten_loai_ghi_chu}</Option>)}
+                                        </Select>
+                                    </Form.Item>
+                                    <Form.Item name="noi_dung_ghi_chu" label="Nội dung ghi chú" rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}>
+                                        <Input.TextArea rows={6} placeholder="Nhập nội dung chi tiết..." />
+                                    </Form.Item>
+                                    <Form.Item name="du_lieu_cau_truc" label="Dữ liệu cấu trúc (JSON)" tooltip="Dành cho các dữ liệu có định dạng đặc biệt">
+                                        <Input.TextArea rows={4} placeholder='{"key": "value"}' style={{ fontFamily: 'monospace' }} />
+                                    </Form.Item>
+                                    <Button type="primary" htmlType="submit">{editingNote ? 'Lưu thay đổi' : 'Lưu ghi chú'}</Button>
+                                </Form>
+                            </>
+                        )}
                     </TabPane>
 
                     <TabPane tab="Chẩn đoán" key="2">
@@ -1289,10 +1495,6 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
 
                         <Divider />
 
-                        <Form.Item name="ket_luan" label="Lời dặn / Tóm tắt của Bác sĩ" rules={[{ required: true }]}>
-                            <Input.TextArea rows={4} spellCheck={false} placeholder="Nhập lời dặn dò, tóm tắt quá trình khám..." />
-                        </Form.Item>
-                        
                         <Form.Item name="ngay_tai_kham" label="Ngày tái khám">
                             <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
                         </Form.Item>
