@@ -752,8 +752,7 @@ const InpatientTreatmentTab = ({ record_id, record_status }: { record_id: number
             <Descriptions bordered size="small" column={2} style={{ marginBottom: 24 }}>
                 <Descriptions.Item label="Ngày nhập viện">{new Date(treatmentRecord.ngay_nhap_vien).toLocaleString('vi-VN')}</Descriptions.Item>
                 <Descriptions.Item label="Bác sĩ phụ trách">{treatmentRecord.bac_si.tai_khoan.ho_ten}</Descriptions.Item>
-                <Descriptions.Item label="Chẩn đoán nhập viện" span={2}>{admissionDiagnosis || <Text type="secondary" italic>(Chưa cập nhật)</Text>}</Descriptions.Item>
-                <Descriptions.Item label="Vị trí">{location}</Descriptions.Item>
+                <Descriptions.Item label="Vị trí" span={2}>{location}</Descriptions.Item>
                 <Descriptions.Item label="Trạng thái điều trị">
                     <Tag color={isDischarged ? "success" : "blue"}>{treatmentRecord.trang_thai_dieu_tri}</Tag>
                 </Descriptions.Item>
@@ -778,10 +777,10 @@ const InpatientTreatmentTab = ({ record_id, record_status }: { record_id: number
 
             <Modal title="Thêm Phiếu theo dõi mới" open={isNoteModalVisible} onOk={handleNoteOk} onCancel={() => setIsNoteModalVisible(false)} okText="Lưu" cancelText="Huỷ">
                 <Form form={noteForm} layout="vertical">
-                    <Form.Item name="dien_bien_benh" label="Diễn biến bệnh" rules={[{ required: true }]}>
+                    <Form.Item name="dien_bien_benh" label="Diễn biến bệnh">
                         <Input.TextArea rows={4} />
                     </Form.Item>
-                    <Form.Item name="y_lenh" label="Y lệnh" rules={[{ required: true }]}>
+                    <Form.Item name="y_lenh" label="Y lệnh">
                         <Input.TextArea rows={4} />
                     </Form.Item>
                     <Row gutter={16}>

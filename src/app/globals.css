@@ -59,3 +59,71 @@ body {
   -ms-transform: rotate(3deg) translate(0px, -4px);
   transform: rotate(3deg) translate(0px, -4px);
 }
+
+/* --- Global Table Customizations (System-wide) --- */
+
+/* 1. Background for Column Headers (same as border color) */
+.ant-table-thead > tr > th {
+  background-color: #e5e7eb !important; /* gray-200 equivalent */
+  /* font-weight and color are now default or inherited */
+}
+
+/* 2. Force Borders on All Tables (Grid Lines) */
+/* Outer border */
+.ant-table-container {
+  border: 1px solid #e5e7eb !important; /* gray-200 equivalent */
+  border-radius: 8px 8px 0 0 !important; /* Rounded top corners */
+}
+
+/* Cell borders (Right and Bottom) */
+.ant-table-thead > tr > th,
+.ant-table-tbody > tr > td {
+  border-right: 1px solid #e5e7eb !important; /* gray-200 equivalent */
+  border-bottom: 1px solid #e5e7eb !important; /* gray-200 equivalent */
+}
+
+/* Remove right border from the last cell in each row to align with container border */
+.ant-table-thead > tr > th:last-child,
+.ant-table-tbody > tr > td:last-child {
+  border-right: none !important;
+}
+
+/* Remove bottom border for the last row to align with container border */
+.ant-table-tbody > tr:last-child > td {
+  border-bottom: none !important;
+}
+
+/* --- Global Descriptions Customizations (System-wide) --- */
+
+/* 1. Background for Labels (Headers equivalent) */
+.ant-descriptions-item-label {
+  background-color: #e5e7eb !important; /* gray-200 equivalent */
+}
+
+/* 2. Force Borders on Descriptions */
+.ant-descriptions-view {
+  border: 1px solid #e5e7eb !important; /* gray-200 equivalent */
+  border-radius: 8px !important; /* consistent rounding */
+}
+
+.ant-descriptions-row > th,
+.ant-descriptions-row > td {
+  border-bottom: 1px solid #e5e7eb !important; /* gray-200 equivalent */
+}
+
+.ant-descriptions-bordered .ant-descriptions-item-label,
+.ant-descriptions-bordered .ant-descriptions-item-content {
+  border-right: 1px solid #e5e7eb !important; /* gray-200 equivalent */
+}
+
+/* Remove bottom border for the last row */
+.ant-descriptions-row:last-child > th,
+.ant-descriptions-row:last-child > td {
+  border-bottom: none !important;
+}
+
+/* Remove right border for the last item in each row */
+.ant-descriptions-row > th:last-child,
+.ant-descriptions-row > td:last-child {
+  border-right: none !important;
+}

@@ -42,9 +42,15 @@ const InpatientListPage = () => {
           `
           id_luot_dieu_tri,
           ngay_nhap_vien,
-          chan_doan_nhap_vien,
           giuong_benh ( id_giuong_benh, so_giuong, phong_benh ( ten_phong, khu_dieu_tri ( ten_khu ) ) ),
-          ho_so_benh_an!inner (id_ho_so, benh_nhan!inner (ho_ten, ngay_sinh)),
+          ho_so_benh_an!inner (
+            id_ho_so, 
+            benh_nhan!inner (ho_ten, ngay_sinh),
+            chan_doan (
+              loai_chan_doan,
+              benh ( ten_benh )
+            )
+          ),
           bac_si:id_bac_si_phu_trach!inner (tai_khoan!inner (ho_ten)),
           phieu_theo_doi_noi_tru ( thoi_gian_tao )
         `
@@ -66,7 +72,19 @@ const InpatientListPage = () => {
           );
           last_follow_up_time = notes[0].thoi_gian_tao;
         }
-        return { ...treatment, last_follow_up_time };
+
+        // Process diagnosis
+        const diagnoses = treatment.ho_so_benh_an?.chan_doan || [];
+        const mainDiagnosis = diagnoses.find((d: any) => d.loai_chan_doan === 'Bệnh chính');
+        const chan_doan_hien_thi = mainDiagnosis 
+          ? mainDiagnosis.benh?.ten_benh 
+          : (diagnoses[0]?.benh?.ten_benh || "Chưa có chẩn đoán");
+
+        return { 
+          ...treatment, 
+          last_follow_up_time,
+          chan_doan_nhap_vien: chan_doan_hien_thi 
+        };
       });
 
       setInpatients(processedData);
