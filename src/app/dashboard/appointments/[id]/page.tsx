@@ -2,17 +2,19 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, message, Spin, Descriptions, Button, Tag, Tabs, Row, Col, Typography, Table, Space, Modal, Form, DatePicker, Select, Input, InputNumber, Image, List, Divider, Alert } from 'antd';
-import { MinusCircleOutlined, PlusOutlined, EditOutlined, ArrowLeftOutlined, DeleteOutlined } from '@ant-design/icons';
+import { MinusCircleOutlined, PlusOutlined, EditOutlined, ArrowLeftOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
 import dayjs from 'dayjs';
+import isBetween from 'dayjs/plugin/isBetween';
+
+dayjs.extend(isBetween);
 
 const { TabPane } = Tabs;
 const { Title, Text } = Typography;
 const { Option } = Select;
-
-// Helper to format currency
+const { RangePicker } = DatePicker;
 const formatCurrency = (value: number | null | undefined) => {
     if (value === null || value === undefined) return '0 VND';
     return value.toLocaleString('vi-VN') + ' VND';
@@ -238,7 +240,6 @@ const LichKhamTab = ({
         { title: 'Ngày khám', dataIndex: 'thoi_gian_kham', key: 'thoi_gian_kham', width: 180, render: (ts:string) => ts ? new Date(ts).toLocaleString('vi-VN') : '-' },
         { title: 'Bác sĩ', dataIndex: ['bac_si', 'tai_khoan', 'ho_ten'], key: 'bac_si', width: 200, render: (text:string) => <Typography.Text style={{ maxWidth: 200 }} ellipsis={{ tooltip: text }}>{text}</Typography.Text> },
         { title: 'Lý do khám', dataIndex: 'ly_do_kham', key: 'ly_do_kham', render: (text:string) => <Typography.Text style={{ maxWidth: 250 }} ellipsis={{ tooltip: text }}>{text}</Typography.Text> },
-        { title: 'Kết luận', dataIndex: 'ket_luan', key: 'ket_luan', render: (text:string) => <Typography.Text style={{ maxWidth: 250 }} ellipsis={{ tooltip: text }}>{text || '-'}</Typography.Text> },
         { title: 'Trạng thái', dataIndex: 'trang_thai', key: 'trang_thai', width: 120, render: (status:string) => { let color = 'default'; if (status === 'Đã Khám') color = 'success'; else if (status === 'Đã Huỷ') color = 'error'; return <Tag color={color}>{status}</Tag>; }},
         {
             title: 'Hành động',
@@ -279,7 +280,6 @@ const LichKhamTab = ({
                         <Descriptions.Item label="Bác sĩ">{viewingAppointment.bac_si?.tai_khoan?.ho_ten}</Descriptions.Item>
                         <Descriptions.Item label="Phòng khám">{viewingAppointment.phong_kham?.ten_phong_kham}</Descriptions.Item>
                         <Descriptions.Item label="Lý do khám">{viewingAppointment.ly_do_kham}</Descriptions.Item>
-                        <Descriptions.Item label="Kết luận">{viewingAppointment.ket_luan || '-'}</Descriptions.Item>
                         <Descriptions.Item label="Chẩn đoán">{viewingAppointment.ho_so_benh_an?.chan_doan?.map((d:any) => d.benh.ten_benh).join(', ') || '-'}</Descriptions.Item>
                         <Descriptions.Item label="Ngày tái khám">{viewingAppointment.ngay_tai_kham ? new Date(viewingAppointment.ngay_tai_kham).toLocaleDateString('vi-VN') : '-'}</Descriptions.Item>
                         <Descriptions.Item label="Chi phí khám">{viewingAppointment.chi_phi_kham ? `${viewingAppointment.chi_phi_kham.toLocaleString('vi-VN')} VND` : '-'}</Descriptions.Item>
@@ -856,11 +856,70 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
   // Note Detail Modal State
   const [viewingMedicalNote, setViewingMedicalNote] = useState<any | null>(null);
   const [isMedicalNoteDetailModalVisible, setIsMedicalNoteDetailModalVisible] = useState(false);
+  const [recentNotes, setRecentNotes] = useState<any[]>([]); // For display in Descriptions (limited)
+  const [allRecordNotes, setAllRecordNotes] = useState<any[]>([]); // For 'All Notes' modal (unlimited)
+  const [isAllNotesModalVisible, setIsAllNotesModalVisible] = useState(false);
+  const [conclusionActiveTab, setConclusionActiveTab] = useState('1'); // Track active tab in Conclusion Modal
+
+  // Filter States for All Notes Modal
+  const [filterNoteType, setFilterNoteType] = useState<number | null>(null);
+  const [filterDateRange, setFilterDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
+  const [filterCreator, setFilterCreator] = useState('');
+
+  const filteredNotes = useMemo(() => {
+      return allRecordNotes.filter(note => {
+          // Filter by Note Type
+          if (filterNoteType && note.id_loai_ghi_chu !== filterNoteType) return false;
+          
+          // Filter by Creator Name
+          if (filterCreator && !note.nguoi_tao?.ho_ten.toLowerCase().includes(filterCreator.toLowerCase())) return false;
+          
+          // Filter by Date Range
+          if (filterDateRange) {
+              const noteDate = dayjs(note.thoi_gian_tao);
+              // Check if date is within range (inclusive)
+              if (noteDate.isBefore(filterDateRange[0].startOf('day')) || noteDate.isAfter(filterDateRange[1].endOf('day'))) {
+                  return false;
+              }
+          }
+          
+          return true;
+      });
+  }, [allRecordNotes, filterNoteType, filterCreator, filterDateRange]);
 
   const router = useRouter();
   const { can, user } = useAuth();
 
-  const fetchNotes = useCallback(async () => {
+  const fetchDisplayNotes = useCallback(async () => {
+      const { data, error } = await supabase
+          .from('ghi_chu_y_te')
+          .select('*, loai_ghi_chu:id_loai_ghi_chu(ten_loai_ghi_chu), nguoi_tao:id_nguoi_tao(ho_ten)')
+          .eq('id_ho_so', params.id)
+          .order('thoi_gian_tao', { ascending: false })
+          .limit(3); // Limit for display
+      
+      if (error) {
+          console.error('Error fetching display notes:', error);
+      } else if (data) {
+          setRecentNotes(data);
+      }
+  }, [params.id]);
+
+  const fetchAllRecordNotes = useCallback(async () => {
+      const { data, error } = await supabase
+          .from('ghi_chu_y_te')
+          .select('*, loai_ghi_chu:id_loai_ghi_chu(ten_loai_ghi_chu), nguoi_tao:id_nguoi_tao(ho_ten)')
+          .eq('id_ho_so', params.id)
+          .order('thoi_gian_tao', { ascending: false });
+      
+      if (error) {
+          console.error('Error fetching all record notes:', error);
+      } else if (data) {
+          setAllRecordNotes(data);
+      }
+  }, [params.id]);
+
+  const fetchNotes = useCallback(async (specificAppointmentId?: number) => {
       if (!record?.id_ho_so) return;
       setLoadingNotes(true);
       
@@ -874,8 +933,11 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
           .eq('id_ho_so', record.id_ho_so)
           .order('thoi_gian_tao', { ascending: false });
 
-      if (editingAppointment?.id_lich_kham) {
-          query = query.eq('id_lich_kham', editingAppointment.id_lich_kham);
+      // Prioritize the specific ID passed directly, otherwise fall back to state
+      const activeAppointmentId = specificAppointmentId ?? editingAppointment?.id_lich_kham;
+
+      if (activeAppointmentId) {
+          query = query.eq('id_lich_kham', activeAppointmentId);
       }
 
       const { data, error } = await query;
@@ -906,18 +968,27 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
                 benh:id_benh(id_benh, ten_benh)
             )
         `)
-        .eq('id_ho_so', params.id)
-        .single();
-
-      if (error || !data) {
-        message.error('Không thể tải thông tin hồ sơ.');
-        router.push('/dashboard/appointments');
-      } else {
-        setRecord(data);
-      }
-      setLoading(false);
-    }, [params.id, router]);
-
+                  .eq('id_ho_so', params.id)
+                  .single();
+        
+              if (error || !data) {
+                message.error('Không thể tải thông tin hồ sơ.');
+                router.push('/dashboard/appointments');
+              } else {
+                // Fetch total notes count separately
+                const { count, error: countError } = await supabase
+                    .from('ghi_chu_y_te')
+                    .select('id_ghi_chu', { count: 'exact', head: true })
+                    .eq('id_ho_so', params.id);
+        
+                if (countError) {
+                    console.error('Error fetching notes count:', countError);
+                }
+                
+                setRecord({ ...data, notes_count: count || 0 });
+              }
+              setLoading(false);
+            }, [params.id, router]);
   const fetchInitialData = useCallback(async () => {
       const { data: diseasesData } = await supabase.from('benh').select('*');
       if (diseasesData) setDiseases(diseasesData);
@@ -932,7 +1003,9 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
   useEffect(() => {
     fetchRecord();
     fetchInitialData();
-  }, [fetchRecord, fetchInitialData]);
+    fetchDisplayNotes(); // Fetch limited notes for display
+    fetchAllRecordNotes(); // Fetch all notes for the modal
+  }, [fetchRecord, fetchInitialData, fetchDisplayNotes, fetchAllRecordNotes]);
 
   const handleEditDiagnosis = () => {
       const currentDiagnoses = record?.chan_doan?.map((d: any) => ({
@@ -992,13 +1065,14 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
       })) || [];
 
       conclusionForm.setFieldsValue({ 
-          ket_luan: appointment.ket_luan,
           ngay_tai_kham: appointment.ngay_tai_kham ? dayjs(appointment.ngay_tai_kham) : null, 
           diagnoses: currentDiagnoses, // Fill the diagnosis list
           prescription: [] 
       });
       setNoteViewMode('list');
-      fetchNotes();
+      // Pass ID directly to avoid stale state issue
+      fetchNotes(appointment.id_lich_kham);
+      setConclusionActiveTab('1');
       setIsConclusionModalVisible(true);
   };
 
@@ -1037,6 +1111,8 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
             message.success('Đã lưu kết luận, chẩn đoán và đơn thuốc.');
             setIsConclusionModalVisible(false);
             fetchRecord();
+            fetchDisplayNotes();
+            fetchAllRecordNotes();
         } catch (info: any) { 
             console.log('Validate Failed:', info); 
             message.error('Lỗi: ' + (info.message || 'Vui lòng kiểm tra lại thông tin.')); 
@@ -1047,6 +1123,9 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
       try {
           const values = await noteForm.validateFields();
           
+          console.log("Saving note with values:", values);
+          console.log("Current editingAppointment:", editingAppointment);
+
           // Validate JSON if present
           if (values.du_lieu_cau_truc) {
               try {
@@ -1077,10 +1156,14 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
 
           noteForm.resetFields();
           setEditingNote(null);
-          fetchNotes();
+          // Ensure we fetch notes for the current appointment context if available
+          fetchNotes(editingAppointment?.id_lich_kham);
+          fetchDisplayNotes(); // Refresh the main list for display
+          fetchAllRecordNotes(); // Refresh the list for the 'All Notes' modal
           setNoteViewMode('list');
       } catch (err: any) {
-          message.error('Lỗi lưu ghi chú: ' + err.message);
+          console.error("Error saving note:", err);
+          message.error('Lỗi lưu ghi chú: ' + (err.message || 'Vui lòng kiểm tra lại thông tin'));
       }
   };
 
@@ -1202,30 +1285,121 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
                 <Descriptions.Item label="Ngày sinh">{record.benh_nhan?.ngay_sinh ? new Date(record.benh_nhan.ngay_sinh).toLocaleDateString('vi-VN') : '-'}</Descriptions.Item>
                 <Descriptions.Item label="Ngày mở hồ sơ">{new Date(record.thoi_gian_mo_ho_so).toLocaleString('vi-VN')}</Descriptions.Item>
                 <Descriptions.Item label="Loại bệnh án"><Tag color={record.loai_benh_an === 'Nội trú' ? 'red' : 'blue'}>{record.loai_benh_an}</Tag></Descriptions.Item>
-                <Descriptions.Item label="Chẩn đoán" span={2}>
+                <Descriptions.Item label="Chẩn đoán" span={1}>
                     <Space wrap>
                         {classifiedDiagnoses.main.length + classifiedDiagnoses.others.length > 0 ? (
                             <>
                                 {[...classifiedDiagnoses.main, ...classifiedDiagnoses.others].slice(0, 3).map((d: any, index: number) => (
-                                    <Tag key={index} color={d.loai_chan_doan === 'Bệnh chính' ? 'volcano' : 'geekblue'}>
+                                    <Tag 
+                                        key={index} 
+                                        color={d.loai_chan_doan === 'Bệnh chính' ? 'volcano' : 'geekblue'}
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => setIsAllDiagnosesModalVisible(true)}
+                                    >
                                         {d.benh.ten_benh}
                                     </Tag>
                                 ))}
                                 {classifiedDiagnoses.main.length + classifiedDiagnoses.others.length > 3 && (
-                                    <Button type="link" size="small" onClick={() => setIsAllDiagnosesModalVisible(true)}>
-                                        (+{classifiedDiagnoses.main.length + classifiedDiagnoses.others.length - 3})
-                                    </Button>
+                                    <Tag 
+                                        style={{ cursor: 'pointer', borderStyle: 'dashed' }}
+                                        onClick={() => setIsAllDiagnosesModalVisible(true)}
+                                    >
+                                        ...
+                                    </Tag>
                                 )}
                             </>
                         ) : (
                             <Text type="secondary">Chưa có chẩn đoán</Text>
                         )}
-                        {record?.trang_thai === 'Đang xử lý' && can('patient.diagnosis.update') && (
-                            <Button type="link" size="small" icon={<EditOutlined />} onClick={handleEditDiagnosis}>Cập nhật</Button>
+                    </Space>
+                </Descriptions.Item>
+                <Descriptions.Item label="Ghi chú y tế" span={1}>
+                    <Space wrap>
+                        {recentNotes.length > 0 ? (
+                            <>
+                                {recentNotes.map((note: any) => (
+                                    <Tag 
+                                        key={note.id_ghi_chu} 
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => setIsAllNotesModalVisible(true)}
+                                    >
+                                        {note.loai_ghi_chu?.ten_loai_ghi_chu}
+                                    </Tag>
+                                ))}
+                                {record && record.notes_count > 3 && (
+                                    <Tag 
+                                        style={{ cursor: 'pointer', borderStyle: 'dashed' }}
+                                        onClick={() => setIsAllNotesModalVisible(true)}
+                                    >
+                                        ...
+                                    </Tag>
+                                )}
+                            </>
+                        ) : (
+                            <Text type="secondary">Chưa có ghi chú</Text>
                         )}
                     </Space>
                 </Descriptions.Item>
             </Descriptions>
+
+            {/* Modal for All Notes */}
+            <Modal
+                title="Tất cả Ghi chú Y tế của Hồ sơ"
+                open={isAllNotesModalVisible}
+                onCancel={() => setIsAllNotesModalVisible(false)}
+                footer={[<Button key="close" onClick={() => setIsAllNotesModalVisible(false)}>Đóng</Button>]}
+                width={900}
+            >
+                <div style={{ marginBottom: 16, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    <Select 
+                        placeholder="Lọc theo loại ghi chú" 
+                        style={{ width: 200 }} 
+                        allowClear 
+                        showSearch // Ensure search is enabled
+                        optionFilterProp="children" // Filter based on Option's children
+                        filterOption={(input, option) =>
+                            (option?.children as string)?.toLowerCase().includes(input.toLowerCase())
+                        }
+                        onChange={setFilterNoteType}
+                    >
+                        {noteTypes.map(nt => <Option key={nt.id_loai_ghi_chu} value={nt.id_loai_ghi_chu}>{nt.ten_loai_ghi_chu}</Option>)}
+                    </Select>
+                    
+                    <RangePicker 
+                        placeholder={['Từ ngày', 'Đến ngày']} 
+                        onChange={(dates) => setFilterDateRange(dates as any)} 
+                        style={{ width: 250 }}
+                        format="DD/MM/YYYY"
+                    />
+                    
+                    <Input 
+                        placeholder="Tìm theo tên người tạo..." 
+                        prefix={<SearchOutlined />} 
+                        style={{ width: 200 }}
+                        onChange={(e) => setFilterCreator(e.target.value)}
+                    />
+                </div>
+
+                <Table
+                    dataSource={filteredNotes} // Now uses filteredNotes
+                    rowKey="id_ghi_chu"
+                    size="small"
+                    pagination={{ pageSize: 7 }}
+                    onRow={(record) => ({
+                        onClick: () => {
+                            setViewingMedicalNote(record);
+                            setIsMedicalNoteDetailModalVisible(true);
+                        },
+                        style: { cursor: 'pointer' }
+                    })}
+                    columns={[
+                        { title: 'Thời gian', dataIndex: 'thoi_gian_tao', key: 'time', render: (t: string) => dayjs(t).format('DD/MM HH:mm'), width: 130 },
+                        { title: 'Loại', dataIndex: ['loai_ghi_chu', 'ten_loai_ghi_chu'], key: 'type', width: 250, render: (t) => <Tag>{t}</Tag> },
+                        { title: 'Nội dung', dataIndex: 'noi_dung_ghi_chu', key: 'content', ellipsis: true },
+                        { title: 'Người tạo', dataIndex: ['nguoi_tao', 'ho_ten'], key: 'creator', width: 120 },
+                    ]}
+                />
+            </Modal>
 
             <Tabs defaultActiveKey="1">
                 <TabPane tab="Lịch sử Khám bệnh" key="1">
@@ -1354,9 +1528,27 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
         </Modal>
 
         {/* Conclusion Modal */}
-        <Modal title={`Kết luận cho Lịch khám #${editingAppointment?.id_lich_kham}`} open={isConclusionModalVisible} onOk={handleConcludeOk} onCancel={() => setIsConclusionModalVisible(false)} okText="Lưu Kết luận & Đơn thuốc" cancelText="Huỷ" width={900}>
+        <Modal 
+            title={`Kết luận cho Lịch khám #${editingAppointment?.id_lich_kham}`} 
+            open={isConclusionModalVisible} 
+            onCancel={() => setIsConclusionModalVisible(false)} 
+            width={900}
+            footer={[
+                <Button key="cancel" onClick={() => setIsConclusionModalVisible(false)}>Đóng</Button>,
+                // Only show "Complete & Prescribe" button if NOT in Note Creating mode (to avoid confusion)
+                // Or show it always but clarify its purpose.
+                // Per user request: Distinguish clearly.
+                // If in Note tab and creating note, user should use "Save Note".
+                // If in Diagnosis or Prescription tab, user uses "Complete".
+                (conclusionActiveTab !== '1' || noteViewMode === 'list') && (
+                    <Button key="submit" type="primary" onClick={handleConcludeOk}>
+                        Hoàn tất Khám & Kê đơn
+                    </Button>
+                )
+            ]}
+        >
             <Form form={conclusionForm} layout="vertical">
-                <Tabs defaultActiveKey="1">
+                <Tabs defaultActiveKey="1" activeKey={conclusionActiveTab} onChange={setConclusionActiveTab}>
                     <TabPane tab="Ghi chép y tế" key="1">
                         {noteViewMode === 'list' ? (
                             <>
@@ -1381,7 +1573,7 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
                                     })}
                                     columns={[
                                         { title: 'Thời gian', dataIndex: 'thoi_gian_tao', key: 'time', render: (t: string) => new Date(t).toLocaleString('vi-VN'), width: 150 },
-                                        { title: 'Loại', dataIndex: ['loai_ghi_chu', 'ten_loai_ghi_chu'], key: 'type', width: 120, render: (t) => <Tag>{t}</Tag> },
+                                        { title: 'Loại', dataIndex: ['loai_ghi_chu', 'ten_loai_ghi_chu'], key: 'type', width: 250, render: (t) => <Tag>{t}</Tag> },
                                         { title: 'Nội dung', dataIndex: 'noi_dung_ghi_chu', key: 'content', ellipsis: true },
                                         { title: 'Người tạo', dataIndex: ['nguoi_tao', 'ho_ten'], key: 'creator', width: 150 },
                                         {
@@ -1397,31 +1589,6 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
                                         }
                                     ]}
                                 />
-                                
-                                <Modal
-                                    title="Chi tiết Ghi chú Y tế"
-                                    open={isMedicalNoteDetailModalVisible}
-                                    onCancel={() => setIsMedicalNoteDetailModalVisible(false)}
-                                    footer={[<Button key="close" onClick={() => setIsMedicalNoteDetailModalVisible(false)}>Đóng</Button>]}
-                                >
-                                    {viewingMedicalNote && (
-                                        <Descriptions column={1} bordered size="small">
-                                            <Descriptions.Item label="Thời gian">{new Date(viewingMedicalNote.thoi_gian_tao).toLocaleString('vi-VN')}</Descriptions.Item>
-                                            <Descriptions.Item label="Loại ghi chú"><Tag>{viewingMedicalNote.loai_ghi_chu?.ten_loai_ghi_chu}</Tag></Descriptions.Item>
-                                            <Descriptions.Item label="Người tạo">{viewingMedicalNote.nguoi_tao?.ho_ten}</Descriptions.Item>
-                                            <Descriptions.Item label="Nội dung">
-                                                <div style={{ whiteSpace: 'pre-wrap' }}>{viewingMedicalNote.noi_dung_ghi_chu}</div>
-                                            </Descriptions.Item>
-                                            {viewingMedicalNote.du_lieu_cau_truc && (
-                                                <Descriptions.Item label="Dữ liệu cấu trúc">
-                                                    <pre style={{ maxHeight: 200, overflow: 'auto' }}>
-                                                        {JSON.stringify(viewingMedicalNote.du_lieu_cau_truc, null, 2)}
-                                                    </pre>
-                                                </Descriptions.Item>
-                                            )}
-                                        </Descriptions>
-                                    )}
-                                </Modal>
                             </>
                         ) : (
                             <>
@@ -1433,9 +1600,16 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
                                     Quay lại danh sách
                                 </Button>
                                 <Title level={5}>{editingNote ? 'Cập nhật ghi chú' : 'Thêm ghi chú mới'}</Title>
-                                <Form form={noteForm} layout="vertical" onFinish={handleSaveNote}>
+                                <Form form={noteForm} layout="vertical">
                                     <Form.Item name="id_loai_ghi_chu" label="Loại ghi chú" rules={[{ required: true, message: 'Vui lòng chọn loại ghi chú' }]}>
-                                        <Select placeholder="Chọn loại ghi chú (Diễn biến, Y lệnh...)">
+                                        <Select 
+                                            placeholder="Chọn loại ghi chú (Diễn biến, Y lệnh...)"
+                                            showSearch
+                                            optionFilterProp="children"
+                                            filterOption={(input, option) =>
+                                                (option?.children as string)?.toLowerCase().includes(input.toLowerCase())
+                                            }
+                                        >
                                             {noteTypes.map(nt => <Option key={nt.id_loai_ghi_chu} value={nt.id_loai_ghi_chu}>{nt.ten_loai_ghi_chu}</Option>)}
                                         </Select>
                                     </Form.Item>
@@ -1445,13 +1619,13 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
                                     <Form.Item name="du_lieu_cau_truc" label="Dữ liệu cấu trúc (JSON)" tooltip="Dành cho các dữ liệu có định dạng đặc biệt">
                                         <Input.TextArea rows={4} placeholder='{"key": "value"}' style={{ fontFamily: 'monospace' }} />
                                     </Form.Item>
-                                    <Button type="primary" htmlType="submit">{editingNote ? 'Lưu thay đổi' : 'Lưu ghi chú'}</Button>
+                                    <Button type="primary" onClick={handleSaveNote}>{editingNote ? 'Lưu thay đổi' : 'Lưu ghi chú'}</Button>
                                 </Form>
                             </>
                         )}
                     </TabPane>
 
-                    <TabPane tab="Chẩn đoán" key="2">
+                    <TabPane tab="Chẩn đoán" key="2" forceRender={true}>
                         {/* Integrated Diagnosis Editing */}
                         <Text strong style={{display: 'block', marginBottom: 8}}>Danh sách chẩn đoán:</Text>
                         <Form.List name="diagnoses">
@@ -1500,7 +1674,7 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
                         </Form.Item>
                     </TabPane>
                     
-                    <TabPane tab="Đơn thuốc" key="3">
+                    <TabPane tab="Đơn thuốc" key="3" forceRender={true}>
                         <Form.List name="prescription">{(fields, { add, remove }) => (<>{fields.map(({ key, name, ...restField }) => {
                             const selectedMedicineId = conclusionForm.getFieldValue(['prescription', name, 'id_thuoc']);
                             const unit = medicines.find(m => m.id_thuoc === selectedMedicineId)?.don_vi_tinh;
@@ -1567,6 +1741,31 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
                 </Space>
             </Modal>
         )}
+
+        <Modal
+            title="Chi tiết Ghi chú Y tế"
+            open={isMedicalNoteDetailModalVisible}
+            onCancel={() => setIsMedicalNoteDetailModalVisible(false)}
+            footer={[<Button key="close" onClick={() => setIsMedicalNoteDetailModalVisible(false)}>Đóng</Button>]}
+        >
+            {viewingMedicalNote && (
+                <Descriptions column={1} bordered size="small">
+                    <Descriptions.Item label="Thời gian">{new Date(viewingMedicalNote.thoi_gian_tao).toLocaleString('vi-VN')}</Descriptions.Item>
+                    <Descriptions.Item label="Loại ghi chú"><Tag>{viewingMedicalNote.loai_ghi_chu?.ten_loai_ghi_chu}</Tag></Descriptions.Item>
+                    <Descriptions.Item label="Người tạo">{viewingMedicalNote.nguoi_tao?.ho_ten}</Descriptions.Item>
+                    <Descriptions.Item label="Nội dung">
+                        <div style={{ whiteSpace: 'pre-wrap' }}>{viewingMedicalNote.noi_dung_ghi_chu}</div>
+                    </Descriptions.Item>
+                    {viewingMedicalNote.du_lieu_cau_truc && (
+                        <Descriptions.Item label="Dữ liệu cấu trúc">
+                            <pre style={{ maxHeight: 200, overflow: 'auto' }}>
+                                {JSON.stringify(viewingMedicalNote.du_lieu_cau_truc, null, 2)}
+                            </pre>
+                        </Descriptions.Item>
+                    )}
+                </Descriptions>
+            )}
+        </Modal>
     </>
   );
 };
