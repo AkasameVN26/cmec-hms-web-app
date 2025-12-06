@@ -24,6 +24,11 @@ export interface Database {
         Insert: Omit<BenhNhan, 'id_benh_nhan'> & { id_benh_nhan?: string }
         Update: Partial<BenhNhan>
       }
+      benh_vien: {
+        Row: BenhVien
+        Insert: Omit<BenhVien, 'id'> & { id?: number }
+        Update: Partial<BenhVien>
+      }
       chan_doan: {
         Row: ChanDoan
         Insert: ChanDoan
@@ -232,6 +237,16 @@ export interface Thuoc {
   don_gia_ban: number
   mo_ta: string | null
   nhom_thuoc: string | null
+}
+
+export interface BenhVien {
+  id: number
+  ten_benh_vien: string
+  dia_chi: string
+  so_dien_thoai: string
+  email: string
+  website: string
+  ngay_thanh_lap: string
 }
 
 export interface TaiKhoan {

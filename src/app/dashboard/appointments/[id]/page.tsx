@@ -1228,7 +1228,24 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
         <Modal title={`Kết luận cho Lịch khám #${editingAppointment?.id_lich_kham}`} open={isConclusionModalVisible} onOk={handleConcludeOk} onCancel={() => setIsConclusionModalVisible(false)} okText="Lưu Kết luận & Đơn thuốc" cancelText="Huỷ" width={900}>
             <Form form={conclusionForm} layout="vertical">
                 <Tabs defaultActiveKey="1">
-                    <TabPane tab="Kết luận & Chẩn đoán" key="1">
+                    <TabPane tab="Ghi chép y tế" key="1">
+                        <Form form={noteForm} layout="vertical" onFinish={handleSaveNote}>
+                            <Form.Item name="id_loai_ghi_chu" label="Loại ghi chú" rules={[{ required: true, message: 'Vui lòng chọn loại ghi chú' }]}>
+                                <Select placeholder="Chọn loại ghi chú (Diễn biến, Y lệnh...)">
+                                    {noteTypes.map(nt => <Option key={nt.id_loai_ghi_chu} value={nt.id_loai_ghi_chu}>{nt.ten_loai_ghi_chu}</Option>)}
+                                </Select>
+                            </Form.Item>
+                            <Form.Item name="noi_dung_ghi_chu" label="Nội dung ghi chú" rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}>
+                                <Input.TextArea rows={6} placeholder="Nhập nội dung chi tiết..." />
+                            </Form.Item>
+                            <Form.Item name="du_lieu_cau_truc" label="Dữ liệu cấu trúc (JSON)" tooltip="Dành cho các dữ liệu có định dạng đặc biệt">
+                                <Input.TextArea rows={4} placeholder='{"key": "value"}' style={{ fontFamily: 'monospace' }} />
+                            </Form.Item>
+                            <Button type="primary" onClick={handleSaveNote}>Lưu ghi chú</Button>
+                        </Form>
+                    </TabPane>
+
+                    <TabPane tab="Chẩn đoán" key="2">
                         {/* Integrated Diagnosis Editing */}
                         <Text strong style={{display: 'block', marginBottom: 8}}>Danh sách chẩn đoán:</Text>
                         <Form.List name="diagnoses">
@@ -1281,7 +1298,7 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
                         </Form.Item>
                     </TabPane>
                     
-                    <TabPane tab="Kê đơn thuốc" key="2">
+                    <TabPane tab="Đơn thuốc" key="3">
                         <Form.List name="prescription">{(fields, { add, remove }) => (<>{fields.map(({ key, name, ...restField }) => {
                             const selectedMedicineId = conclusionForm.getFieldValue(['prescription', name, 'id_thuoc']);
                             const unit = medicines.find(m => m.id_thuoc === selectedMedicineId)?.don_vi_tinh;
@@ -1300,23 +1317,6 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
                                 <MinusCircleOutlined onClick={() => remove(name)} />
                             </Space>)
                         })}<Form.Item><Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>Thêm thuốc</Button></Form.Item></>)}</Form.List>
-                    </TabPane>
-
-                    <TabPane tab="Ghi chú Y tế" key="3">
-                        <Form form={noteForm} layout="vertical" onFinish={handleSaveNote}>
-                            <Form.Item name="id_loai_ghi_chu" label="Loại ghi chú" rules={[{ required: true, message: 'Vui lòng chọn loại ghi chú' }]}>
-                                <Select placeholder="Chọn loại ghi chú (Diễn biến, Y lệnh...)">
-                                    {noteTypes.map(nt => <Option key={nt.id_loai_ghi_chu} value={nt.id_loai_ghi_chu}>{nt.ten_loai_ghi_chu}</Option>)}
-                                </Select>
-                            </Form.Item>
-                            <Form.Item name="noi_dung_ghi_chu" label="Nội dung ghi chú" rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}>
-                                <Input.TextArea rows={6} placeholder="Nhập nội dung chi tiết..." />
-                            </Form.Item>
-                            <Form.Item name="du_lieu_cau_truc" label="Dữ liệu cấu trúc (JSON)" tooltip="Dành cho các dữ liệu có định dạng đặc biệt">
-                                <Input.TextArea rows={4} placeholder='{"key": "value"}' style={{ fontFamily: 'monospace' }} />
-                            </Form.Item>
-                            <Button type="primary" onClick={handleSaveNote}>Lưu ghi chú</Button>
-                        </Form>
                     </TabPane>
                 </Tabs>
             </Form>

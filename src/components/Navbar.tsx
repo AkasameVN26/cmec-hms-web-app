@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Menu } from "antd";
+import { ImPlus } from "react-icons/im";
 import {
   DashboardOutlined,
   TeamOutlined,
@@ -14,6 +16,7 @@ import {
 } from "@ant-design/icons";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
+import { supabase } from "@/lib/supabase";
 import NProgress from "nprogress";
 
 const { SubMenu } = Menu;
@@ -22,6 +25,22 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
   const router = useRouter();
   const pathname = usePathname();
   const { roles } = useAuth();
+  const [hospitalName, setHospitalName] = useState<string>('CMEC');
+
+  useEffect(() => {
+    const fetchHospitalInfo = async () => {
+      const { data, error } = await supabase
+        .from('benh_vien')
+        .select('ten_benh_vien')
+        .single();
+      
+      if (data && !error) {
+        setHospitalName(data.ten_benh_vien);
+      }
+    };
+
+    fetchHospitalInfo();
+  }, []);
 
   // Role checks
   const isQuanLy = roles.includes('Quản lý');
@@ -51,12 +70,24 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
           style={{
             color: "white",
             margin: 0,
-            fontSize: "24px",
+            fontSize: collapsed ? "24px" : "18px",
             fontWeight: "bold",
             transition: "opacity 0.3s",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            width: "100%",
+            padding: "0 10px",
           }}
         >
-          {collapsed ? "C" : "CMEC"}
+          {collapsed ? (
+             <ImPlus style={{ fontSize: '24px', color: 'white' }} />
+          ) : (
+             `${hospitalName} HMS`
+          )}
         </h1>
       </div>
       <Menu
