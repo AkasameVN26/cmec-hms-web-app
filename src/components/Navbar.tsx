@@ -111,7 +111,6 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
             >
                 <Menu.Item key="/dashboard/patients">Quản lý Bệnh nhân</Menu.Item>
                 <Menu.Item key="/dashboard/appointments">Quản lý Hồ sơ</Menu.Item>
-                <Menu.Item key="/dashboard/appointments/calendar">Đặt lịch hẹn nhanh</Menu.Item>
             </SubMenu>
         )}
 
@@ -187,6 +186,9 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
                     <Menu.Item key="/dashboard/diseases">Quản lý Bệnh</Menu.Item>
                     <Menu.Item key="/dashboard/clinical-services/services">
                         Dịch vụ CLS
+                    </Menu.Item>
+                    <Menu.Item key="/dashboard/note-types">
+                        Danh mục Ghi chú
                     </Menu.Item>
                     <Menu.Item key="/dashboard/specialties">
                         Danh sách chuyên khoa
