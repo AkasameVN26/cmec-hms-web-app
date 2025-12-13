@@ -74,11 +74,19 @@ const InpatientListPage = () => {
         }
 
         // Process diagnosis
-        const diagnoses = treatment.ho_so_benh_an?.chan_doan || [];
+        const hoSo = Array.isArray(treatment.ho_so_benh_an) 
+          ? treatment.ho_so_benh_an[0] 
+          : treatment.ho_so_benh_an;
+        
+        const diagnoses = hoSo?.chan_doan || [];
         const mainDiagnosis = diagnoses.find((d: any) => d.loai_chan_doan === 'Bệnh chính');
-        const chan_doan_hien_thi = mainDiagnosis 
-          ? mainDiagnosis.benh?.ten_benh 
-          : (diagnoses[0]?.benh?.ten_benh || "Chưa có chẩn đoán");
+        
+        const getBenhName = (d: any) => {
+             if (!d || !d.benh) return null;
+             return Array.isArray(d.benh) ? d.benh[0]?.ten_benh : d.benh.ten_benh;
+        };
+
+        const chan_doan_hien_thi = getBenhName(mainDiagnosis) || getBenhName(diagnoses[0]) || "Chưa có chẩn đoán";
 
         return { 
           ...treatment, 

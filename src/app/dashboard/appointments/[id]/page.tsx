@@ -42,6 +42,7 @@ import LichKhamTab from "@/components/dashboard/medical-record/LichKhamTab";
 import ChiDinhClsTab from "@/components/dashboard/medical-record/ChiDinhClsTab";
 import DonThuocTab from "@/components/dashboard/medical-record/DonThuocTab";
 import InpatientTreatmentTab from "@/components/dashboard/medical-record/InpatientTreatmentTab";
+import AIChatWidget from "@/components/dashboard/medical-record/AIChatWidget";
 
 dayjs.extend(isBetween);
 
@@ -105,6 +106,7 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
     [dayjs.Dayjs, dayjs.Dayjs] | null
   >(null);
   const [filterCreator, setFilterCreator] = useState("");
+  const [activeTab, setActiveTab] = useState("1");
 
   const filteredNotes = useMemo(() => {
     return allRecordNotes.filter((note) => {
@@ -826,7 +828,7 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
           />
         </Modal>
 
-        <Tabs defaultActiveKey="1">
+        <Tabs activeKey={activeTab} onChange={setActiveTab}>
           <TabPane tab="Lịch sử Khám bệnh" key="1">
             <LichKhamTab
               record_id={record.id_ho_so}
@@ -1496,6 +1498,8 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
           </Descriptions>
         )}
       </Modal>
+
+      <AIChatWidget recordId={params.id} />
     </>
   );
 };
