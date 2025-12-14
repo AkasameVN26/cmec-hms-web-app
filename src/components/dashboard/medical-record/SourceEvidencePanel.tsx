@@ -1,0 +1,134 @@
+"use client";
+import React, { useEffect, useRef } from 'react';
+import { Typography, Empty, Spin, Alert, Tooltip } from 'antd'; // Import Alert and Tooltip
+
+const { Title, Text } = Typography;
+
+interface MatchDetail {
+    summary_idx: number;
+    source_indices: number[];
+    scores: number[];
+}
+
+interface ExplainResponse {
+    source_sentences: string[];
+    summary_sentences: string[];
+    matches: MatchDetail[];
+    avg_similarity_score: number;
+    low_similarity_matches: MatchDetail[]; // Add low_similarity_matches
+}
+
+interface SourceEvidencePanelProps {
+    data: ExplainResponse | null;
+    loading: boolean;
+    hoveredSummaryIdx: number | null;
+}
+
+const SIMILARITY_THRESHOLD = 0.7; // Update threshold for warning
+
+const SourceEvidencePanel: React.FC<SourceEvidencePanelProps> = ({ data, loading, hoveredSummaryIdx }) => {
+    const scrollRefs = useRef<(HTMLSpanElement | null)[]>([]);
+
+    // Auto-scroll to the highlighted source sentence
+    useEffect(() => {
+        if (hoveredSummaryIdx !== null && data) {
+            const match = data.matches.find(m => m.summary_idx === hoveredSummaryIdx);
+            if (match && match.source_indices.length > 0) {
+                const firstSourceIdx = match.source_indices[0];
+                const el = scrollRefs.current[firstSourceIdx];
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+    }, [hoveredSummaryIdx, data]);
+
+    const getSourceHighlightColor = (sourceIdx: number) => {
+        if (hoveredSummaryIdx === null || !data) return 'transparent';
+        
+        const match = data.matches.find(m => m.summary_idx === hoveredSummaryIdx);
+        if (match && match.source_indices.includes(sourceIdx)) {
+            return '#fffb8f'; // Yellow highlight
+        }
+        return 'transparent';
+    };
+
+    const getSourceSimilarityScore = (sourceIdx: number) => {
+        if (hoveredSummaryIdx === null || !data) return null;
+        
+        const match = data.matches.find(m => m.summary_idx === hoveredSummaryIdx);
+        if (match && match.source_indices.includes(sourceIdx)) {
+            const indexInMatch = match.source_indices.indexOf(sourceIdx);
+            return match.scores[indexInMatch];
+        }
+        return null;
+    };
+
+    const shouldShowWarning = data && data.avg_similarity_score < SIMILARITY_THRESHOLD;
+
+    return (
+        <div className="h-full flex flex-col border-r border-gray-200 bg-gray-50">
+            <div className="p-3 border-b border-gray-200 bg-white">
+                <Title level={5} style={{ margin: 0 }}>Văn bản gốc (Bằng chứng)</Title>
+            </div>
+            
+            {shouldShowWarning && (
+                <Alert
+                    message="Cảnh báo: Độ tương đồng thấp"
+                    description={`Điểm tương đồng trung bình của các câu tóm tắt và câu gốc là ${data.avg_similarity_score.toFixed(2)}. Bác sĩ vui lòng đọc kỹ hồ sơ gốc để xác minh thông tin.`}
+                    type="warning"
+                    showIcon
+                    closable
+                    style={{ margin: '8px 16px' }}
+                />
+            )}
+
+            <div className="flex-1 overflow-y-auto p-4 leading-7 text-gray-800">
+                <Spin spinning={loading}>
+                    {!data && !loading ? (
+                        <div className="flex items-center justify-center h-40">
+                             <Empty description="Chưa có dữ liệu" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                        </div>
+                    ) : (
+                        <div>
+                            {data?.source_sentences.map((sent, idx) => {
+                                const score = getSourceSimilarityScore(idx);
+                                const textElement = (
+                                    <span 
+                                        ref={el => { scrollRefs.current[idx] = el; }}
+                                        style={{ 
+                                            backgroundColor: getSourceHighlightColor(idx),
+                                            transition: 'background-color 0.2s ease',
+                                            padding: '2px 0',
+                                            borderRadius: 2,
+                                            // whiteSpace: 'pre-wrap' // Removed
+                                        }}
+                                    >
+                                        {sent.trim()}
+                                    </span>
+                                );
+
+                                const wrappedElement = score !== null ? (
+                                    <Tooltip title={`Điểm tương đồng: ${score.toFixed(2)}`} placement="top">
+                                        {textElement}
+                                    </Tooltip>
+                                ) : (
+                                    textElement
+                                );
+
+                                return (
+                                    <React.Fragment key={idx}>
+                                        {wrappedElement}
+                                        <br />
+                                    </React.Fragment>
+                                );
+                            })}
+                        </div>
+                    )}
+                </Spin>
+            </div>
+        </div>
+    );
+};
+
+export default SourceEvidencePanel;
