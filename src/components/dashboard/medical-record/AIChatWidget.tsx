@@ -34,6 +34,12 @@ interface Message {
   isExplained?: boolean; // New flag to indicate if this message has explanation data
 }
 
+interface SourceSegment {
+    content: string;
+    source_type: string;
+    source_id?: string | number | null;
+}
+
 interface MatchDetail {
     summary_idx: number;
     source_indices: number[];
@@ -41,7 +47,7 @@ interface MatchDetail {
 }
 
 interface ExplainResponse {
-    source_sentences: string[];
+    notes: SourceSegment[];
     summary_sentences: string[];
     matches: MatchDetail[];
     avg_similarity_score: number;
@@ -221,7 +227,6 @@ const AIChatWidget = ({
                               <br />
                           </React.Fragment>
                       );
-
                   })}
               </div>
           );

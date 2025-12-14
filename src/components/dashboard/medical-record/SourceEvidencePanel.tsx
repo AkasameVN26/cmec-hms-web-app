@@ -4,6 +4,12 @@ import { Typography, Empty, Spin, Alert, Tooltip } from 'antd'; // Import Alert 
 
 const { Title, Text } = Typography;
 
+interface SourceSegment {
+    content: string;
+    source_type: string;
+    source_id?: string | number | null;
+}
+
 interface MatchDetail {
     summary_idx: number;
     source_indices: number[];
@@ -11,7 +17,7 @@ interface MatchDetail {
 }
 
 interface ExplainResponse {
-    source_sentences: string[];
+    notes: SourceSegment[];
     summary_sentences: string[];
     matches: MatchDetail[];
     avg_similarity_score: number;
@@ -27,7 +33,7 @@ interface SourceEvidencePanelProps {
 const SIMILARITY_THRESHOLD = 0.7; // Update threshold for warning
 
 const SourceEvidencePanel: React.FC<SourceEvidencePanelProps> = ({ data, loading, hoveredSummaryIdx }) => {
-    const scrollRefs = useRef<(HTMLSpanElement | null)[]>([]);
+    const scrollRefs = useRef<(HTMLDivElement | null)[]>([]);
 
     // Auto-scroll to the highlighted source sentence
     useEffect(() => {
@@ -91,36 +97,37 @@ const SourceEvidencePanel: React.FC<SourceEvidencePanelProps> = ({ data, loading
                         </div>
                     ) : (
                         <div>
-                            {data?.source_sentences.map((sent, idx) => {
+                            {data?.notes.map((note, idx) => {
                                 const score = getSourceSimilarityScore(idx);
-                                const textElement = (
-                                    <span 
+                                const content = (
+                                    <div 
+                                        key={idx}
                                         ref={el => { scrollRefs.current[idx] = el; }}
                                         style={{ 
-                                            backgroundColor: getSourceHighlightColor(idx),
                                             transition: 'background-color 0.2s ease',
-                                            padding: '2px 0',
-                                            borderRadius: 2,
-                                            // whiteSpace: 'pre-wrap' // Removed
+                                            padding: '12px',
+                                            marginBottom: '12px',
+                                            borderRadius: 6,
+                                            border: '1px solid #e0e0e0',
+                                            backgroundColor: getSourceHighlightColor(idx) !== 'transparent' ? '#fffb8f' : '#fff'
                                         }}
                                     >
-                                        {sent.trim()}
-                                    </span>
+                                        <div style={{ marginBottom: 4 }}>
+                                            <Text type="secondary" style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                                                {note.source_type} {note.source_id ? `#${note.source_id}` : ''}
+                                            </Text>
+                                        </div>
+                                        <div style={{ whiteSpace: 'pre-wrap' }}>
+                                            {note.content}
+                                        </div>
+                                    </div>
                                 );
-
-                                const wrappedElement = score !== null ? (
+                                return score !== null ? (
                                     <Tooltip title={`Điểm tương đồng: ${score.toFixed(2)}`} placement="top">
-                                        {textElement}
+                                        {content}
                                     </Tooltip>
                                 ) : (
-                                    textElement
-                                );
-
-                                return (
-                                    <React.Fragment key={idx}>
-                                        {wrappedElement}
-                                        <br />
-                                    </React.Fragment>
+                                    content
                                 );
                             })}
                         </div>
