@@ -99,25 +99,34 @@ const SourceEvidencePanel: React.FC<SourceEvidencePanelProps> = ({ data, loading
                         <div>
                             {data?.notes.map((note, idx) => {
                                 const score = getSourceSimilarityScore(idx);
+                                const prevNote = idx > 0 ? data.notes[idx - 1] : null;
+                                const isSameSource = prevNote && prevNote.source_type === note.source_type && prevNote.source_id === note.source_id;
+
                                 const content = (
                                     <div 
                                         key={idx}
                                         ref={el => { scrollRefs.current[idx] = el; }}
                                         style={{ 
                                             transition: 'background-color 0.2s ease',
-                                            padding: '12px',
-                                            marginBottom: '12px',
-                                            borderRadius: 6,
+                                            padding: '8px 12px', // Reduced padding
+                                            // Combine with previous if same source
+                                            marginTop: isSameSource ? '-8px' : '0', 
+                                            marginBottom: '8px',
+                                            borderRadius: isSameSource ? '0 0 6px 6px' : '6px',
+                                            // Visual separation logic
                                             border: '1px solid #e0e0e0',
+                                            borderTop: isSameSource ? 'none' : '1px solid #e0e0e0',
                                             backgroundColor: getSourceHighlightColor(idx) !== 'transparent' ? '#fffb8f' : '#fff'
                                         }}
                                     >
-                                        <div style={{ marginBottom: 4 }}>
-                                            <Text type="secondary" style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                                                {note.source_type} {note.source_id ? `#${note.source_id}` : ''}
-                                            </Text>
-                                        </div>
-                                        <div style={{ whiteSpace: 'pre-wrap' }}>
+                                        {!isSameSource && (
+                                            <div style={{ marginBottom: 4, paddingBottom: 4, borderBottom: '1px dashed #f0f0f0' }}>
+                                                <Text type="secondary" style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                                                    {note.source_type}
+                                                </Text>
+                                            </div>
+                                        )}
+                                        <div style={{ whiteSpace: 'pre-wrap', fontSize: '13px' }}>
                                             {note.content}
                                         </div>
                                     </div>
