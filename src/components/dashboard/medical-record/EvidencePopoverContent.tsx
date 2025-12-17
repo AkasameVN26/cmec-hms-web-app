@@ -1,8 +1,8 @@
 import React from 'react';
-import { Typography, Empty, Tag, Space } from 'antd';
+import { Typography, Empty, Tag, Space, Tooltip } from 'antd';
 import { FileTextOutlined } from '@ant-design/icons';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 interface SourceSegment {
     content: string;
@@ -37,39 +37,105 @@ const EvidencePopoverContent: React.FC<EvidencePopoverContentProps> = ({ data, s
         );
     }
 
-    // Filter relevant notes based on source_indices
-    const evidenceItems = match.source_indices.map((sourceIdx, idx) => ({
-        note: data.notes[sourceIdx],
-        score: match.scores[idx]
-    }));
+    const matchingIndices = new Set(match.source_indices);
+    
+    // 1. Identify relevant Source IDs (key = type + id)
+    // We want to show the FULL note if any part of it is matched.
+    const relevantSourceKeys = new Set<string>();
+    match.source_indices.forEach(idx => {
+        const note = data.notes[idx];
+        if (note) relevantSourceKeys.add(`${note.source_type}_${note.source_id}`);
+    });
+
+    // 2. Reconstruct the full notes from segments
+    // Group all segments from data.notes that belong to the identified sources
+    const groupedNotes: Record<string, { 
+        type: string, 
+        id: string, 
+        segments: { content: string, isMatch: boolean, score?: number }[] 
+    }> = {};
+    
+    data.notes.forEach((note, idx) => {
+        const key = `${note.source_type}_${note.source_id}`;
+        
+        // Only include this note group if it contains at least one piece of evidence
+        if (relevantSourceKeys.has(key)) {
+            if (!groupedNotes[key]) {
+                groupedNotes[key] = { 
+                    type: note.source_type, 
+                    id: note.source_id?.toString() || '', 
+                    segments: [] 
+                };
+            }
+            
+            const isMatch = matchingIndices.has(idx);
+            let score = 0;
+            if (isMatch) {
+                const matchIdx = match.source_indices.indexOf(idx);
+                score = match.scores[matchIdx];
+            }
+
+            groupedNotes[key].segments.push({
+                content: note.content,
+                isMatch,
+                score
+            });
+        }
+    });
 
     return (
-        <div className="w-[400px] max-h-[400px] overflow-y-auto">
-            <div className="mb-2 border-b pb-2">
+        <div className="w-[550px] max-h-[500px] overflow-y-auto p-2">
+            <div className="mb-3 px-2 border-b border-gray-100 pb-2 flex justify-between items-center sticky top-0 bg-white z-10">
                 <Text strong type="secondary" style={{ fontSize: 12 }}>
-                    TÌM THẤY {evidenceItems.length} NGUỒN DẪN CHỨNG:
+                    NGUỒN DẪN CHỨNG ({Object.keys(groupedNotes).length} tài liệu)
                 </Text>
             </div>
-            <div className="flex flex-col gap-3">
-                {evidenceItems.map((item, index) => (
+            
+            <div className="flex flex-col gap-4 px-2 pb-2">
+                {Object.values(groupedNotes).map((group, gIdx) => (
                     <div 
-                        key={index} 
-                        className="bg-gray-50 p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
+                        key={gIdx} 
+                        className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden"
                     >
-                        <div className="flex justify-between items-center mb-1">
-                            <Space size={4}>
+                        {/* Header of the Note */}
+                        <div className="bg-gray-50 px-3 py-2 border-b border-gray-100 flex justify-between items-center">
+                            <Space>
                                 <FileTextOutlined className="text-blue-500" />
-                                <Tag color="blue" bordered={false} style={{ margin: 0, fontSize: 10 }}>
-                                    {item.note.source_type}
-                                </Tag>
+                                <Text strong className="text-gray-700 text-sm">
+                                    {group.type} 
+                                    {group.id && <span className="font-normal text-gray-500 ml-1">#{group.id}</span>}
+                                </Text>
                             </Space>
-                            <Tag color={item.score >= 0.7 ? "success" : "warning"} bordered={false}>
-                                {Math.round(item.score * 100)}% khớp
-                            </Tag>
                         </div>
-                        <Text className="text-gray-700 text-sm block leading-relaxed">
-                            {item.note.content}
-                        </Text>
+
+                        {/* Content of the Note (Reconstructed from segments) */}
+                        <div className="p-4 text-sm leading-relaxed text-gray-800 text-justify">
+                            {group.segments.map((seg, sIdx) => {
+                                // Logic to render highlighted text or normal text
+                                if (seg.isMatch) {
+                                    return (
+                                        <Tooltip 
+                                            key={sIdx} 
+                                            title={`Độ khớp: ${Math.round((seg.score || 0) * 100)}%`}
+                                            placement="top"
+                                        >
+                                            <span 
+                                                className="bg-yellow-200 border-b-2 border-yellow-300 px-0.5 rounded-sm cursor-help transition-colors hover:bg-yellow-300"
+                                            >
+                                                {seg.content}
+                                            </span>
+                                            {/* Add a space after segment to ensure natural reading flow */}
+                                            {' '}
+                                        </Tooltip>
+                                    );
+                                }
+                                return (
+                                    <span key={sIdx} className="text-gray-600">
+                                        {seg.content}{' '}
+                                    </span>
+                                );
+                            })}
+                        </div>
                     </div>
                 ))}
             </div>
