@@ -10,8 +10,10 @@ import {
   Typography,
   Space,
   Spin,
-  Tooltip, // Import Tooltip
+  Tooltip,
   Tag,
+  Popover,
+  Badge
 } from "antd";
 import {
   CommentOutlined,
@@ -19,10 +21,10 @@ import {
   UserOutlined,
   RobotOutlined,
   FileSearchOutlined,
-  CompressOutlined,
-  ExclamationCircleOutlined, // Import for warning icon
+  ExclamationCircleOutlined,
+  CheckCircleOutlined
 } from "@ant-design/icons";
-import SourceEvidencePanel from "./SourceEvidencePanel";
+import EvidencePopoverContent from "./EvidencePopoverContent";
 
 const { Text } = Typography;
 
@@ -31,7 +33,6 @@ interface Message {
   role: "user" | "ai";
   content: string;
   timestamp: Date;
-  isExplained?: boolean; // New flag to indicate if this message has explanation data
 }
 
 interface SourceSegment {
@@ -51,7 +52,7 @@ interface ExplainResponse {
     summary_sentences: string[];
     matches: MatchDetail[];
     avg_similarity_score: number;
-    low_similarity_matches: MatchDetail[]; // Add low_similarity_matches
+    low_similarity_matches: MatchDetail[];
 }
 
 const AIChatWidget = ({
@@ -63,11 +64,11 @@ const AIChatWidget = ({
   const [isLoading, setIsLoading] = useState(false);
   
   // Explain / Evidence States
-  const [showEvidence, setShowEvidence] = useState(false);
   const [isExplainLoading, setIsExplainLoading] = useState(false);
   const [explainData, setExplainData] = useState<ExplainResponse | null>(null);
-  const [hoveredSummaryIdx, setHoveredSummaryIdx] = useState<number | null>(null);
-  const [hoveredSentenceScore, setHoveredSentenceScore] = useState<number | null>(null); // New state
+  
+  // Track which sentence is currently selected (clicked)
+  const [selectedSummaryIdx, setSelectedSummaryIdx] = useState<number | null>(null);
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -86,47 +87,45 @@ const AIChatWidget = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isOpen, showEvidence]);
+  }, [messages, isOpen, explainData]);
 
-  const handleToggleEvidence = async () => {
-      if (showEvidence) {
-          setShowEvidence(false);
-          return;
+  // Function to fetch explanation/evidence data
+  const handleFetchEvidence = async (contentOverride?: string) => {
+      // Use override content if provided, otherwise find the last AI message
+      let summaryText = contentOverride;
+      
+      if (!summaryText) {
+        const lastAiMsg = [...messages].reverse().find(m => m.role === 'ai' && m.id !== 'welcome');
+        if (lastAiMsg) summaryText = lastAiMsg.content;
       }
-
-      // If opening evidence panel, fetch data if not already present
-      // Find the last AI message (excluding welcome) to explain
-      const lastAiMsg = [...messages].reverse().find(m => m.role === 'ai' && m.id !== 'welcome');
       
-      if (!lastAiMsg) return;
+      if (!summaryText) return;
 
-      setShowEvidence(true);
+      // Don't refetch if we already have data for this exact summary (simple check)
+      // For now, we always fetch to be safe or if re-summarized
       
-      if (!explainData) {
-        setIsExplainLoading(true);
-        try {
-            const response = await fetch(`http://127.0.0.1:8000/api/explain/${recordId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ summary: lastAiMsg.content })
-            });
+      setIsExplainLoading(true);
+      try {
+          const response = await fetch(`http://127.0.0.1:8000/api/explain/${recordId}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ summary: summaryText })
+          });
 
-            if (!response.ok) throw new Error('Failed to fetch explanation');
-            const data: ExplainResponse = await response.json(); // Cast to ExplainResponse
-            setExplainData(data);
-        } catch (error) {
-            console.error("Explain error:", error);
-        } finally {
-            setIsExplainLoading(false);
-        }
+          if (!response.ok) throw new Error('Failed to fetch explanation');
+          const data: ExplainResponse = await response.json();
+          setExplainData(data);
+      } catch (error) {
+          console.error("Explain error:", error);
+      } finally {
+          setIsExplainLoading(false);
       }
   };
 
   const handleSummarizeRecord = async () => {
     setIsLoading(true);
-    // Reset evidence data when generating new summary
-    setExplainData(null);
-    setShowEvidence(false);
+    setExplainData(null); // Reset evidence data
+    setSelectedSummaryIdx(null);
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -172,6 +171,10 @@ const AIChatWidget = ({
           )
         );
       }
+      
+      // Auto fetch evidence immediately after summary finishes
+      await handleFetchEvidence(aiContent);
+
     } catch (error: any) {
       console.error("Error summarizing:", error);
       const errorMsg: Message = {
@@ -186,56 +189,72 @@ const AIChatWidget = ({
     }
   };
 
-  // Render logic for AI messages
+  // Render logic for AI messages with interactive sentences
   const renderAiMessageContent = (msg: Message) => {
-      // Only special rendering if evidence mode is ON and we have data
-      if (showEvidence && explainData && msg.id !== 'welcome' && !isLoading) {
+      // Only special rendering if evidence data exists and it's not the welcome message
+      if (explainData && msg.id !== 'welcome' && !isLoading) {
           return (
-              <div>
+              <div className="leading-relaxed">
                   {explainData.summary_sentences.map((sent, idx) => {
                       const isLowSimilarity = explainData.low_similarity_matches.some(m => m.summary_idx === idx);
-                      const matchForSentence = explainData.matches.find(m => m.summary_idx === idx);
-                      const score = matchForSentence && matchForSentence.scores.length > 0 ? matchForSentence.scores[0] : null;
-
+                      const isSelected = selectedSummaryIdx === idx;
+                      
                       return (
-                          <React.Fragment key={idx}>
+                          <Popover
+                            key={idx}
+                            content={<EvidencePopoverContent data={explainData} summaryIdx={idx} />}
+                            title={
+                                <Space>
+                                    <FileSearchOutlined className="text-blue-500"/> 
+                                    <span>Nguồn chứng minh</span>
+                                </Space>
+                            }
+                            trigger="click"
+                            open={isSelected}
+                            onOpenChange={(visible) => setSelectedSummaryIdx(visible ? idx : null)}
+                            placement="right"
+                            overlayInnerStyle={{ padding: 0 }}
+                          >
                               <span
-                                onMouseEnter={() => {
-                                    setHoveredSummaryIdx(idx);
-                                    setHoveredSentenceScore(score); // Set score on hover
-                                }}
-                                onMouseLeave={() => {
-                                    setHoveredSummaryIdx(null);
-                                    setHoveredSentenceScore(null); // Clear score on leave
-                                }}
-                                style={{
-                                    backgroundColor: hoveredSummaryIdx === idx ? '#bae7ff' : (isLowSimilarity ? '#ffe0b2' : 'transparent'), // Light orange for low similarity
-                                    cursor: 'pointer',
-                                    transition: 'background-color 0.2s',
-                                    borderRadius: 2,
-                                    // whiteSpace: 'pre-wrap' // Removed
-                                }}
+                                className={`
+                                    inline-block px-1 rounded transition-colors duration-200 cursor-pointer mb-1 mr-1 border-b border-transparent
+                                    ${isSelected 
+                                        ? 'bg-[#b7eb8f] border-green-500' // Dark Green (Active)
+                                        : 'hover:bg-[#d9f7be] hover:border-green-300' // Light Green (Hover)
+                                    }
+                                `}
+                                title="Nhấn để xem bằng chứng"
                               >
-                                  {sent.trim()}{' '}
+                                  {sent.trim()}
                                   {isLowSimilarity && (
-                                    <ExclamationCircleOutlined 
-                                        style={{ color: '#faad14', marginLeft: 4, fontSize: 10 }} 
-                                        title="Độ tương đồng thấp" 
-                                    />
+                                    <Tooltip title="Cảnh báo: Độ tin cậy thấp (Không tìm thấy nguồn khớp chính xác)">
+                                        <ExclamationCircleOutlined 
+                                            style={{ color: '#faad14', marginLeft: 4, fontSize: 12 }} 
+                                        />
+                                    </Tooltip>
                                   )}
                               </span>
-                              <br />
-                          </React.Fragment>
+                          </Popover>
                       );
                   })}
               </div>
           );
       }
+      
+      // Show loading state specifically for explanation if main loading is done but explain is pending
+      if (isExplainLoading && msg.id !== 'welcome') {
+           return (
+               <div>
+                   <Text style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{msg.content}</Text>
+                   <div className="mt-2 text-xs text-blue-500 flex items-center gap-2">
+                       <Spin size="small" /> Đang phân tích nguồn chứng minh...
+                   </div>
+               </div>
+           );
+      }
+
       return <Text style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{msg.content}</Text>;
   };
-
-  // Determine container width
-  const containerWidth = showEvidence ? 900 : 480;
 
   return (
     <>
@@ -248,25 +267,22 @@ const AIChatWidget = ({
       />
 
         <Card
-          className={`fixed bottom-[90px] right-[24px] h-[600px] z-[1000] flex flex-col shadow-lg rounded-xl border border-gray-300 transition-all duration-300 ease-in-out transform
+          className={`fixed bottom-[90px] right-[24px] h-[600px] z-[1000] flex flex-col shadow-2xl rounded-xl border border-gray-200 transition-all duration-300 ease-in-out transform
             ${isOpen ? "scale-100 opacity-100 visible" : "scale-95 opacity-0 invisible pointer-events-none"}`}
-          style={{ width: containerWidth }}
+          style={{ width: 480 }} // Fixed width, no split screen
           title={
             <Space>
               <RobotOutlined style={{ color: "#1890ff" }} />
               <Text strong>Trợ lý AI</Text>
-              {showEvidence && explainData && (
-                hoveredSentenceScore !== null ? (
-                    <Tag color={hoveredSentenceScore >= 0.7 ? "blue" : "error"}>
-                        Câu: {hoveredSentenceScore.toFixed(2)}
+              {explainData && (
+                <Tooltip title="Độ tin cậy tổng thể của bản tóm tắt">
+                    <Tag 
+                        icon={explainData.avg_similarity_score >= 0.7 ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />} 
+                        color={explainData.avg_similarity_score >= 0.7 ? "success" : "warning"}
+                    >
+                        Tin cậy: {Math.round(explainData.avg_similarity_score * 100)}%
                     </Tag>
-                ) : (
-                    <Tooltip title="Điểm tương đồng trung bình">
-                        <Tag color={explainData.avg_similarity_score >= 0.7 ? "success" : "warning"}>
-                            TB: {explainData.avg_similarity_score.toFixed(2)}
-                        </Tag>
-                    </Tooltip>
-                )
+                </Tooltip>
               )}
             </Space>
           }
@@ -274,7 +290,7 @@ const AIChatWidget = ({
             <Button
               type="text"
               icon={<CloseOutlined />}
-              onClick={() => { setIsOpen(false); setShowEvidence(false); }}
+              onClick={() => { setIsOpen(false); setSelectedSummaryIdx(null); }}
             />
           }
           bodyStyle={{
@@ -282,32 +298,15 @@ const AIChatWidget = ({
             overflow: "hidden",
             padding: 0,
             display: "flex",
-            flexDirection: "row", // Change to row for side-by-side
-          }}
-          headStyle={{
-            minHeight: 46,
-            padding: "0 12px",
+            flexDirection: "column",
           }}
         >
-          {/* LEFT PANEL: EVIDENCE (Only visible if showEvidence is true) */}
-          {showEvidence && (
-              <div style={{ width: '50%', height: '100%', borderRight: '1px solid #f0f0f0' }}>
-                  <SourceEvidencePanel 
-                    data={explainData} 
-                    loading={isExplainLoading} 
-                    hoveredSummaryIdx={hoveredSummaryIdx} 
-                  />
-              </div>
-          )}
-
-          {/* RIGHT PANEL: CHAT */}
-          <div style={{ width: showEvidence ? '50%' : '100%', display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Messages Area */}
+          {/* Chat Messages Area */}
             <div
                 style={{
                 flex: 1,
                 overflowY: "auto",
-                padding: "12px",
+                padding: "16px",
                 backgroundColor: "#f5f5f5",
                 }}
             >
@@ -317,7 +316,7 @@ const AIChatWidget = ({
                 renderItem={(item) => (
                     <List.Item
                     style={{
-                        padding: "4px 0",
+                        padding: "8px 0",
                         justifyContent:
                         item.role === "user" ? "flex-end" : "flex-start",
                     }}
@@ -328,7 +327,7 @@ const AIChatWidget = ({
                         flexDirection:
                             item.role === "user" ? "row-reverse" : "row",
                         maxWidth: "95%",
-                        gap: 8,
+                        gap: 12,
                         alignItems: "flex-start",
                         }}
                     >
@@ -345,83 +344,75 @@ const AIChatWidget = ({
                             backgroundColor:
                             item.role === "user" ? "#87d068" : "#1890ff",
                             flexShrink: 0,
+                            marginTop: 4
                         }}
                         />
                         <div
                         style={{
                             backgroundColor:
                             item.role === "user" ? "#95de64" : "#ffffff",
-                            padding: "8px 12px",
-                            borderRadius: "12px",
+                            padding: "10px 14px",
+                            borderRadius: "16px",
                             borderTopRightRadius:
-                            item.role === "user" ? "2px" : "12px",
+                            item.role === "user" ? "4px" : "16px",
                             borderTopLeftRadius:
-                            item.role === "ai" ? "2px" : "12px",
-                            boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                            item.role === "ai" ? "4px" : "16px",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
                             maxWidth: "100%",
                         }}
                         >
-                            {/* Use custom renderer for content */}
+                            {/* Render Content */}
                             {item.role === 'ai' ? renderAiMessageContent(item) : <Text style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{item.content}</Text>}
                         </div>
                     </div>
                     </List.Item>
                 )}
                 />
+                
+                {/* Loading Indicators */}
                 {isLoading && (
-                <div style={{ padding: "8px 0", display: "flex", gap: 8 }}>
-                    <Avatar
-                    size="small"
-                    icon={<RobotOutlined />}
-                    style={{ backgroundColor: "#1890ff" }}
-                    />
-                    <div
-                    style={{
-                        backgroundColor: "#fff",
-                        padding: "8px 12px",
-                        borderRadius: "12px",
-                        borderTopLeftRadius: "2px",
-                    }}
-                    >
-                    <Spin size="small" />
+                <div style={{ padding: "8px 0", display: "flex", gap: 12 }}>
+                    <Avatar size="small" icon={<RobotOutlined />} style={{ backgroundColor: "#1890ff" }} />
+                    <div className="bg-white p-3 rounded-xl rounded-tl-sm shadow-sm">
+                        <Spin size="small" tip="Đang tóm tắt..." />
                     </div>
                 </div>
                 )}
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area */}
+            {/* Input / Actions Area */}
             <div
                 style={{
                 padding: "12px",
                 borderTop: "1px solid #f0f0f0",
                 backgroundColor: "#fff",
-                textAlign: "center",
                 display: "flex",
-                gap: 8
+                gap: 8,
+                flexDirection: 'column'
                 }}
             >
-                <Button
-                type="primary"
-                onClick={handleSummarizeRecord}
-                loading={isLoading}
-                disabled={isLoading}
-                style={{ flex: 1 }}
-                >
-                Tóm tắt hồ sơ
-                </Button>
-                <Button
-                icon={showEvidence ? <CompressOutlined /> : <FileSearchOutlined />}
-                onClick={handleToggleEvidence}
-                disabled={isLoading || messages.length <= 1} 
-                title={showEvidence ? "Ẩn bằng chứng" : "Xem bằng chứng trích dẫn"}
-                type={showEvidence ? "default" : "dashed"}
-                />
+                {/* Helper hint when evidence is available */}
+                {explainData && !isLoading && (
+                    <div className="text-xs text-gray-500 text-center mb-1">
+                        <ExclamationCircleOutlined /> Nhấn vào từng câu để xem bằng chứng gốc
+                    </div>
+                )}
+
+                <div className="flex gap-2">
+                    <Button
+                    type="primary"
+                    onClick={handleSummarizeRecord}
+                    loading={isLoading || isExplainLoading}
+                    disabled={isLoading || isExplainLoading}
+                    style={{ flex: 1 }}
+                    >
+                    {messages.length > 1 ? "Tóm tắt lại" : "Tóm tắt hồ sơ"}
+                    </Button>
+                </div>
             </div>
-          </div>
         </Card>
     </>
   );
 };
-
 export default AIChatWidget;
