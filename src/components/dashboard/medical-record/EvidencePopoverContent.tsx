@@ -84,7 +84,7 @@ const EvidencePopoverContent: React.FC<EvidencePopoverContentProps> = ({ data, s
     });
 
     return (
-        <div className="w-[550px] max-h-[500px] overflow-y-auto p-2">
+        <div className="w-[550px] max-h-[500px] overflow-y-auto p-2 border border-gray-300 rounded-lg">
             <div className="mb-3 px-2 border-b border-gray-100 pb-2 flex justify-between items-center sticky top-0 bg-white z-10">
                 <Text strong type="secondary" style={{ fontSize: 12 }}>
                     NGUỒN DẪN CHỨNG ({Object.keys(groupedNotes).length} tài liệu)

@@ -267,7 +267,7 @@ const AIChatWidget = ({
       />
 
         <Card
-          className={`fixed bottom-[90px] right-[24px] h-[600px] z-[1000] flex flex-col shadow-2xl rounded-xl border border-gray-200 transition-all duration-300 ease-in-out transform
+          className={`fixed bottom-[90px] right-[24px] h-[600px] z-[1000] flex flex-col shadow-2xl rounded-xl border border-gray-300 transition-all duration-300 ease-in-out transform
             ${isOpen ? "scale-100 opacity-100 visible" : "scale-95 opacity-0 invisible pointer-events-none"}`}
           style={{ width: 480 }} // Fixed width, no split screen
           title={
