@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Row, Col, Card, Statistic, Spin, Alert, Typography, DatePicker, Button, Space } from 'antd';
+import { Row, Col, Card, Statistic, Spin, Alert, Typography, DatePicker, Button, Space, Tooltip } from 'antd';
 import { UserOutlined, MedicineBoxOutlined, DollarCircleOutlined, AreaChartOutlined, BarChartOutlined, PieChartOutlined, ScheduleOutlined, BugOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { supabase } from '@/lib/supabase';
 import dynamic from 'next/dynamic';
@@ -289,9 +289,13 @@ const ManagerDashboard = () => {
 
             <Row justify="center" style={{ marginTop: '24px' }}>
                 <Space>
-                    <Button icon={<LeftOutlined />} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} />
+                    <Tooltip title="Trang trước">
+                        <Button aria-label="Trang trước" icon={<LeftOutlined />} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} />
+                    </Tooltip>
                     <Typography.Text>Trang {currentPage} / 3</Typography.Text>
-                    <Button icon={<RightOutlined />} onClick={() => setCurrentPage(p => Math.min(3, p + 1))} disabled={currentPage === 3} />
+                    <Tooltip title="Trang sau">
+                        <Button aria-label="Trang sau" icon={<RightOutlined />} onClick={() => setCurrentPage(p => Math.min(3, p + 1))} disabled={currentPage === 3} />
+                    </Tooltip>
                 </Space>
             </Row>
         </div>
