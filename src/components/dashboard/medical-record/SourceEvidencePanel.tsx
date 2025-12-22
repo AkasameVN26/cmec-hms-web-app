@@ -1,28 +1,9 @@
 "use client";
 import React, { useEffect, useRef } from 'react';
 import { Typography, Empty, Spin, Alert, Tooltip } from 'antd'; // Import Alert and Tooltip
+import { ExplainResponse } from '@/types/ai';
 
 const { Title, Text } = Typography;
-
-interface SourceSegment {
-    content: string;
-    source_type: string;
-    source_id?: string | number | null;
-}
-
-interface MatchDetail {
-    summary_idx: number;
-    source_indices: number[];
-    scores: number[];
-}
-
-interface ExplainResponse {
-    notes: SourceSegment[];
-    summary_sentences: string[];
-    matches: MatchDetail[];
-    avg_similarity_score: number;
-    low_similarity_matches: MatchDetail[]; // Add low_similarity_matches
-}
 
 interface SourceEvidencePanelProps {
     data: ExplainResponse | null;

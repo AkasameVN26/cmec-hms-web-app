@@ -25,6 +25,8 @@ import {
   CheckCircleOutlined
 } from "@ant-design/icons";
 import EvidencePopoverContent from "./EvidencePopoverContent";
+import { ExplainResponse } from "@/types/ai";
+import { aiService } from "@/services/api";
 
 const { Text } = Typography;
 
@@ -33,26 +35,6 @@ interface Message {
   role: "user" | "ai";
   content: string;
   timestamp: Date;
-}
-
-interface SourceSegment {
-    content: string;
-    source_type: string;
-    source_id?: string | number | null;
-}
-
-interface MatchDetail {
-    summary_idx: number;
-    source_indices: number[];
-    scores: number[];
-}
-
-interface ExplainResponse {
-    notes: SourceSegment[];
-    summary_sentences: string[];
-    matches: MatchDetail[];
-    avg_similarity_score: number;
-    low_similarity_matches: MatchDetail[];
 }
 
 const AIChatWidget = ({
@@ -106,14 +88,7 @@ const AIChatWidget = ({
       
       setIsExplainLoading(true);
       try {
-          const response = await fetch(`http://127.0.0.1:8000/api/explain/${recordId}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ summary: summaryText })
-          });
-
-          if (!response.ok) throw new Error('Failed to fetch explanation');
-          const data: ExplainResponse = await response.json();
+          const data = await aiService.fetchExplanation(recordId, summaryText);
           setExplainData(data);
       } catch (error) {
           console.error("Explain error:", error);
@@ -146,7 +121,7 @@ const AIChatWidget = ({
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/summarize-stream/${recordId}`,
+        aiService.getSummaryStreamUrl(recordId),
         {
           method: "GET",
         }
