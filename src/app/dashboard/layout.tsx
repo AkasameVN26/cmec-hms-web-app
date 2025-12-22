@@ -1,33 +1,22 @@
 'use client';
 
-import { useState, useEffect } from "react";
-import { Button, Layout, message, Typography, Dropdown, Menu, Space, Avatar, Modal, Form, Input } from "antd";
+import { useState } from "react";
+import { Button, Layout, message, Dropdown, Menu, Space, Avatar, Modal, Form, Input } from "antd";
 import { UserOutlined, DownOutlined, LogoutOutlined, MailOutlined } from '@ant-design/icons';
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import Navbar from "@/components/Navbar";
+import Clock from "@/components/Clock";
 import { useAuth } from "@/providers/AuthProvider";
 
 const { Header, Content, Sider } = Layout;
-const { Text } = Typography;
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const { user, profile, roles, loading: authLoading } = useAuth();
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [collapsed, setCollapsed] = useState(true);
   const [isEmailModalVisible, setIsEmailModalVisible] = useState(false);
   const [emailForm] = Form.useForm();
-
-  useEffect(() => {
-    const timer = setInterval(() => { setCurrentTime(new Date()); }, 1000);
-    return () => { clearInterval(timer); };
-  }, []);
-
-  const formatDateTime = (date: Date) => {
-    const weekdays = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}, ${weekdays[date.getDay()]}, ngày ${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
-  };
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -85,9 +74,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
         <div>
           <h1 style={{ color: 'white', margin: 0, fontSize: '20px' }}>{getTitle()}</h1>
         </div>
-        <div style={{ textAlign: 'center' }}>
-          <Text style={{ color: 'white', fontSize: '14px' }}>{formatDateTime(currentTime)}</Text>
-        </div>
+        <Clock />
         <Dropdown overlay={menu} trigger={['click']}>
             <a onClick={e => e.preventDefault()} style={{ color: 'white' }}>
                 <Space>

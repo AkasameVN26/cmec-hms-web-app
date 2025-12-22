@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@ant-design/cssinjs": "^1.24.0",
+    "@ant-design/icons": "^6.1.0",
     "@ant-design/nextjs-registry": "^1.1.0",
     "@fullcalendar/daygrid": "^6.1.19",
     "@fullcalendar/interaction": "^6.1.19",
@@ -32,8 +33,8 @@
     "@types/nprogress": "^0.2.3",
     "@types/react": "^18.3.27",
     "@types/react-dom": "^18.3.7",
-    "eslint": "^9.39.2",
-    "eslint-config-next": "^16.0.7",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.35",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"

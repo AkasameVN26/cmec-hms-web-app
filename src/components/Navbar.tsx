@@ -18,10 +18,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import NProgress from "nprogress";
+import React from "react";
 
 const { SubMenu } = Menu;
 
-const Navbar = ({ collapsed }: { collapsed: boolean }) => {
+const Navbar = React.memo(function Navbar({ collapsed }: { collapsed: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const { roles } = useAuth();
@@ -203,6 +204,6 @@ const Navbar = ({ collapsed }: { collapsed: boolean }) => {
       </Menu>
     </>
   );
-};
+});
 
 export default Navbar;
