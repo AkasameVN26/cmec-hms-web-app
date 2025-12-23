@@ -34,7 +34,7 @@ const LoginPage = () => {
             name="email"
             rules={[{ required: true, message: 'Vui lòng nhập email của bạn!' }]}
           >
-            <Input />
+            <Input placeholder="ví dụ: admin@cmec.com" type="email" autoComplete="email" />
           </Form.Item>
 
           <Form.Item
@@ -42,7 +42,7 @@ const LoginPage = () => {
             name="password"
             rules={[{ required: true, message: 'Vui lòng nhập mật khẩu của bạn!' }]}
           >
-            <Input.Password />
+            <Input.Password placeholder="Nhập mật khẩu" autoComplete="current-password" />
           </Form.Item>
 
           <Form.Item>
