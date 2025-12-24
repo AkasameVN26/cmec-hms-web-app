@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Row, Col, Card, Statistic, Spin, Alert, Typography, DatePicker, Button, Space } from 'antd';
 import { UserOutlined, MedicineBoxOutlined, DollarCircleOutlined, AreaChartOutlined, BarChartOutlined, PieChartOutlined, ScheduleOutlined, BugOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { supabase } from '@/lib/supabase';
@@ -23,6 +23,10 @@ const ManagerDashboard = () => {
     const [onCallDutyMonth, setOnCallDutyMonth] = useState<Dayjs>(dayjs());
     const [topDiseasesMonth, setTopDiseasesMonth] = useState<Dayjs>(dayjs());
     const [currentPage, setCurrentPage] = useState(1);
+
+    // Refs to track last fetched month to prevent redundant fetching
+    const lastFetchedPage2Month = useRef<string | null>(null);
+    const lastFetchedPage3Month = useRef<string | null>(null);
 
     // Initial data fetch for KPIs and page 1
     useEffect(() => {
@@ -54,6 +58,11 @@ const ManagerDashboard = () => {
     // Fetch data for page 2
     useEffect(() => {
         if (currentPage !== 2) return;
+
+        // Bolt: Optimization - Check if data for this month is already fetched
+        const currentMonth = topDiseasesMonth.format('YYYY-MM');
+        if (lastFetchedPage2Month.current === currentMonth) return;
+
         const fetchPage2Data = async () => {
             try {
                 setLoading(true);
@@ -70,6 +79,9 @@ const ManagerDashboard = () => {
 
                 setPatientsChart(patientsRes.data || []);
                 setTopDiseasesChart(topDiseasesRes.data || []);
+
+                // Update ref to indicate successful fetch for this month
+                lastFetchedPage2Month.current = currentMonth;
             } catch (err: any) {
                 setError(err.message);
             } finally {
@@ -82,6 +94,11 @@ const ManagerDashboard = () => {
     // Fetch data for page 3
     useEffect(() => {
         if (currentPage !== 3) return;
+
+        // Bolt: Optimization - Check if data for this month is already fetched
+        const currentMonth = onCallDutyMonth.format('YYYY-MM');
+        if (lastFetchedPage3Month.current === currentMonth) return;
+
         const fetchPage3Data = async () => {
             try {
                 setLoading(true);
@@ -93,6 +110,9 @@ const ManagerDashboard = () => {
                 if (error) throw new Error(`On-Call Duty Chart Error: ${error.message}`);
 
                 setOnCallDutyChart(data || []);
+
+                // Update ref to indicate successful fetch for this month
+                lastFetchedPage3Month.current = currentMonth;
             } catch (err: any) {
                 setError(err.message);
             } finally {
