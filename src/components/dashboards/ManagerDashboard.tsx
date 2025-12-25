@@ -125,6 +125,8 @@ const ManagerDashboard = () => {
     // Bolt: Optimization - Memoize chart options to prevent unnecessary recalculations and re-renders
     const revenueChartOptions = useMemo(() => ({
         tooltip: { trigger: 'axis' },
+        animationDuration: 500,
+        animationEasing: 'cubicOut',
         xAxis: { type: 'category', data: revenueChart.map(d => d.month) },
         yAxis: { type: 'value', axisLabel: { formatter: (value: number) => `${(value / 1000000).toFixed(1)}M` } },
         series: [{ name: 'Doanh thu', type: 'line', smooth: true, data: revenueChart.map(d => d.revenue) }],
@@ -133,6 +135,8 @@ const ManagerDashboard = () => {
 
     const specialtyChartOptions = useMemo(() => ({
         tooltip: { trigger: 'item' },
+        animationDuration: 500,
+        animationEasing: 'cubicOut',
         legend: { orient: 'vertical', left: 'left' },
         series: [{
             name: 'Lượt khám',
@@ -145,6 +149,8 @@ const ManagerDashboard = () => {
 
     const newPatientsChartOptions = useMemo(() => ({
         tooltip: { trigger: 'axis' },
+        animationDuration: 500,
+        animationEasing: 'cubicOut',
         xAxis: { type: 'category', data: patientsChart.map(d => d.month) },
         yAxis: { type: 'value' },
         series: [{ name: 'Bệnh nhân mới', type: 'bar', data: patientsChart.map(d => d.new_patients) }],
@@ -198,6 +204,8 @@ const ManagerDashboard = () => {
                     return tooltip;
                 }
             },
+            animationDuration: 500,
+            animationEasing: 'cubicOut',
             legend: { data: shifts },
             grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
             xAxis: { type: 'value', name: 'Tổng giờ trực' },
@@ -208,6 +216,8 @@ const ManagerDashboard = () => {
 
     const topDiseasesChartOptions = useMemo(() => ({
         tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        animationDuration: 500,
+        animationEasing: 'cubicOut',
         xAxis: { type: 'value', name: 'Số lượng bệnh nhân' },
         yAxis: { type: 'category', data: topDiseasesChart.map(d => d.disease_name).reverse() },
         series: [{
@@ -230,12 +240,12 @@ const ManagerDashboard = () => {
                     <Row gutter={[16, 16]}>
                         <Col xs={24} lg={12}>
                             <Card title={<><AreaChartOutlined /> Doanh thu 12 tháng qua</>}>
-                                <ReactECharts option={revenueChartOptions} style={{ height: 300 }} />
+                                <ReactECharts key="revenue-chart" option={revenueChartOptions} style={{ height: 300 }} notMerge={true} />
                             </Card>
                         </Col>
                         <Col xs={24} lg={12}>
                             <Card title={<><PieChartOutlined /> Top 5 chuyên khoa có nhiều lượt khám nhất</>}>
-                                <ReactECharts option={specialtyChartOptions} style={{ height: 300 }} />
+                                <ReactECharts key="specialty-chart" option={specialtyChartOptions} style={{ height: 300 }} notMerge={true} />
                             </Card>
                         </Col>
                     </Row>
@@ -246,7 +256,7 @@ const ManagerDashboard = () => {
                         <Row gutter={[16, 16]}>
                             <Col span={24}>
                                 <Card title={<><BarChartOutlined /> Lượng bệnh nhân mới 12 tháng qua</>}>
-                                    <ReactECharts option={newPatientsChartOptions} style={{ height: 300 }} />
+                                    <ReactECharts key="new-patients-chart" option={newPatientsChartOptions} style={{ height: 300 }} notMerge={true} />
                                 </Card>
                             </Col>
                         </Row>
@@ -256,7 +266,7 @@ const ManagerDashboard = () => {
                                     title={<><BugOutlined /> Top 10 bệnh có nhiều bệnh nhân nhất</>}
                                     extra={<DatePicker picker="month" value={topDiseasesMonth} onChange={(date) => setTopDiseasesMonth(date || dayjs())} />}
                                 >
-                                    <ReactECharts option={topDiseasesChartOptions} style={{ height: 400 }} />
+                                    <ReactECharts key="top-diseases-chart" option={topDiseasesChartOptions} style={{ height: 400 }} notMerge={true} />
                                 </Card>
                             </Col>
                         </Row>
@@ -270,7 +280,7 @@ const ManagerDashboard = () => {
                                 title={<><ScheduleOutlined /> Thống kê lịch trực của bác sĩ</>}
                                 extra={<DatePicker picker="month" value={onCallDutyMonth} onChange={(date) => setOnCallDutyMonth(date || dayjs())} />}
                             >
-                                <ReactECharts option={onCallDutyChartOptions} style={{ height: 400 }} />
+                                <ReactECharts key="on-call-duty-chart" option={onCallDutyChartOptions} style={{ height: 400 }} notMerge={true} />
                             </Card>
                         </Col>
                     </Row>
