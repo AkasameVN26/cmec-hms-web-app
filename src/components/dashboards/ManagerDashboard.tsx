@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Row, Col, Card, Statistic, Spin, Alert, Typography, DatePicker, Button, Space } from 'antd';
 import { UserOutlined, MedicineBoxOutlined, DollarCircleOutlined, AreaChartOutlined, BarChartOutlined, PieChartOutlined, ScheduleOutlined, BugOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { supabase } from '@/lib/supabase';
@@ -122,15 +122,16 @@ const ManagerDashboard = () => {
         fetchPage3Data();
     }, [currentPage, onCallDutyMonth]);
 
-    const getRevenueChartOptions = () => ({
+    // Bolt: Optimization - Memoize chart options to prevent unnecessary recalculations and re-renders
+    const revenueChartOptions = useMemo(() => ({
         tooltip: { trigger: 'axis' },
         xAxis: { type: 'category', data: revenueChart.map(d => d.month) },
         yAxis: { type: 'value', axisLabel: { formatter: (value: number) => `${(value / 1000000).toFixed(1)}M` } },
         series: [{ name: 'Doanh thu', type: 'line', smooth: true, data: revenueChart.map(d => d.revenue) }],
         grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    });
+    }), [revenueChart]);
 
-    const getSpecialtyChartOptions = () => ({
+    const specialtyChartOptions = useMemo(() => ({
         tooltip: { trigger: 'item' },
         legend: { orient: 'vertical', left: 'left' },
         series: [{
@@ -140,17 +141,17 @@ const ManagerDashboard = () => {
             data: specialtyChart,
             emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
         }]
-    });
+    }), [specialtyChart]);
 
-    const getNewPatientsChartOptions = () => ({
+    const newPatientsChartOptions = useMemo(() => ({
         tooltip: { trigger: 'axis' },
         xAxis: { type: 'category', data: patientsChart.map(d => d.month) },
         yAxis: { type: 'value' },
         series: [{ name: 'Bệnh nhân mới', type: 'bar', data: patientsChart.map(d => d.new_patients) }],
         grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    });
+    }), [patientsChart]);
 
-    const getOnCallDutyChartOptions = () => {
+    const onCallDutyChartOptions = useMemo(() => {
         const doctors = Array.from(new Set(onCallDutyChart.map(d => d.doctor_name)));
         const shifts = ['Sáng', 'Chiều', 'Tối'];
         const shiftDurations: { [key: string]: number } = {
@@ -203,9 +204,9 @@ const ManagerDashboard = () => {
             yAxis: { type: 'category', data: doctors },
             series: series
         };
-    };
+    }, [onCallDutyChart]);
 
-    const getTopDiseasesChartOptions = () => ({
+    const topDiseasesChartOptions = useMemo(() => ({
         tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
         xAxis: { type: 'value', name: 'Số lượng bệnh nhân' },
         yAxis: { type: 'category', data: topDiseasesChart.map(d => d.disease_name).reverse() },
@@ -216,7 +217,7 @@ const ManagerDashboard = () => {
             label: { show: true, position: 'right' }
         }],
         grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    });
+    }), [topDiseasesChart]);
 
     const renderPage = () => {
         if (loading) {
@@ -229,12 +230,12 @@ const ManagerDashboard = () => {
                     <Row gutter={[16, 16]}>
                         <Col xs={24} lg={12}>
                             <Card title={<><AreaChartOutlined /> Doanh thu 12 tháng qua</>}>
-                                <ReactECharts option={getRevenueChartOptions()} style={{ height: 300 }} />
+                                <ReactECharts option={revenueChartOptions} style={{ height: 300 }} />
                             </Card>
                         </Col>
                         <Col xs={24} lg={12}>
                             <Card title={<><PieChartOutlined /> Top 5 chuyên khoa có nhiều lượt khám nhất</>}>
-                                <ReactECharts option={getSpecialtyChartOptions()} style={{ height: 300 }} />
+                                <ReactECharts option={specialtyChartOptions} style={{ height: 300 }} />
                             </Card>
                         </Col>
                     </Row>
@@ -245,7 +246,7 @@ const ManagerDashboard = () => {
                         <Row gutter={[16, 16]}>
                             <Col span={24}>
                                 <Card title={<><BarChartOutlined /> Lượng bệnh nhân mới 12 tháng qua</>}>
-                                    <ReactECharts option={getNewPatientsChartOptions()} style={{ height: 300 }} />
+                                    <ReactECharts option={newPatientsChartOptions} style={{ height: 300 }} />
                                 </Card>
                             </Col>
                         </Row>
@@ -255,7 +256,7 @@ const ManagerDashboard = () => {
                                     title={<><BugOutlined /> Top 10 bệnh có nhiều bệnh nhân nhất</>}
                                     extra={<DatePicker picker="month" value={topDiseasesMonth} onChange={(date) => setTopDiseasesMonth(date || dayjs())} />}
                                 >
-                                    <ReactECharts option={getTopDiseasesChartOptions()} style={{ height: 400 }} />
+                                    <ReactECharts option={topDiseasesChartOptions} style={{ height: 400 }} />
                                 </Card>
                             </Col>
                         </Row>
@@ -269,7 +270,7 @@ const ManagerDashboard = () => {
                                 title={<><ScheduleOutlined /> Thống kê lịch trực của bác sĩ</>}
                                 extra={<DatePicker picker="month" value={onCallDutyMonth} onChange={(date) => setOnCallDutyMonth(date || dayjs())} />}
                             >
-                                <ReactECharts option={getOnCallDutyChartOptions()} style={{ height: 400 }} />
+                                <ReactECharts option={onCallDutyChartOptions} style={{ height: 400 }} />
                             </Card>
                         </Col>
                     </Row>
