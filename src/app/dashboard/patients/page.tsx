@@ -1,7 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, Table, Select, DatePicker, Button, Form, Row, Col, Space, Modal, message, Descriptions, Spin, Input } from 'antd';
+import { Card, Table, Select, DatePicker, Button, Form, Row, Col, Space, Modal, message, Descriptions, Spin, Input, Tooltip } from 'antd';
+import {
+  EyeOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  FileAddOutlined,
+  FileSearchOutlined
+} from '@ant-design/icons';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
@@ -11,6 +18,7 @@ const { Option } = Select;
 const PatientsPage = () => {
   const [patients, setPatients] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
   const [isPatientModalVisible, setIsPatientModalVisible] = useState(false);
   const [editingPatient, setEditingPatient] = useState<any | null>(null);
@@ -96,6 +104,7 @@ const PatientsPage = () => {
       content: 'Hành động này sẽ xoá vĩnh viễn bệnh nhân và tất cả các dữ liệu liên quan (hồ sơ bệnh án, lịch khám...). KHÔNG THỂ HOÀN TÁC.',
       okText: 'Xác nhận Xoá',
       cancelText: 'Huỷ',
+      okButtonProps: { danger: true },
       onOk: async () => {
         try {
           const { error } = await supabase.rpc('delete_patient_and_related_data', { p_patient_id: patientId });
@@ -112,6 +121,7 @@ const PatientsPage = () => {
   const handleModalOk = async () => {
     try {
         const values = await form.validateFields();
+        setSaveLoading(true);
         const submissionData = { ...values, ngay_sinh: values.ngay_sinh ? values.ngay_sinh.format('YYYY-MM-DD') : null };
         let error;
 
@@ -132,6 +142,8 @@ const PatientsPage = () => {
         }
     } catch (err) {
         console.log('Validation Failed:', err);
+    } finally {
+        setSaveLoading(false);
     }
   };
 
@@ -160,21 +172,44 @@ const PatientsPage = () => {
     {
       title: 'Hành động',
       key: 'action',
-      width: 320,
+      width: 200,
       render: (_: any, record: any) => (
         <Space size="small">
             {record.open_record_id ? (
-                <Button type="primary" onClick={() => router.push(`/dashboard/appointments/${record.open_record_id}`)}>
-                    Xem hồ sơ
-                </Button>
+                <Tooltip title="Xem hồ sơ bệnh án">
+                    <Button
+                        type="primary"
+                        icon={<FileSearchOutlined />}
+                        onClick={() => router.push(`/dashboard/appointments/${record.open_record_id}`)}
+                    />
+                </Tooltip>
             ) : (
-                <Button onClick={() => handleCreateMedicalRecord(record)}>
-                    Tạo hồ sơ
-                </Button>
+                <Tooltip title="Tạo hồ sơ mới">
+                    <Button
+                        icon={<FileAddOutlined />}
+                        onClick={() => handleCreateMedicalRecord(record)}
+                    />
+                </Tooltip>
             )}
-          <Button onClick={() => handleViewDetails(record)}>Chi tiết</Button>
-          <Button onClick={() => handleEdit(record)}>Sửa</Button>
-          <Button danger onClick={() => handleDelete(record.id_benh_nhan)}>Xoá</Button>
+            <Tooltip title="Chi tiết thông tin">
+                <Button
+                    icon={<EyeOutlined />}
+                    onClick={() => handleViewDetails(record)}
+                />
+            </Tooltip>
+            <Tooltip title="Chỉnh sửa">
+                <Button
+                    icon={<EditOutlined />}
+                    onClick={() => handleEdit(record)}
+                />
+            </Tooltip>
+            <Tooltip title="Xoá bệnh nhân">
+                <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => handleDelete(record.id_benh_nhan)}
+                />
+            </Tooltip>
         </Space>
       ),
     },
@@ -211,7 +246,7 @@ const PatientsPage = () => {
         <Table columns={columns} dataSource={patients} loading={loading} rowKey="id_benh_nhan" tableLayout="fixed" scroll={{ x: 'max-content' }} />
       </Card>
 
-      <Modal title="Chi tiết Bệnh nhân" visible={isDetailsModalVisible} onCancel={() => setIsDetailsModalVisible(false)} footer={<Button onClick={() => setIsDetailsModalVisible(false)}>Đóng</Button>} width={600}>
+      <Modal title="Chi tiết Bệnh nhân" open={isDetailsModalVisible} onCancel={() => setIsDetailsModalVisible(false)} footer={<Button onClick={() => setIsDetailsModalVisible(false)}>Đóng</Button>} width={600}>
         {selectedPatientDetails && <Descriptions bordered column={1}>
             <Descriptions.Item label="Họ tên">{selectedPatientDetails.ho_ten}</Descriptions.Item>
             <Descriptions.Item label="Ngày sinh">{selectedPatientDetails.ngay_sinh ? new Date(selectedPatientDetails.ngay_sinh).toLocaleDateString() : '-'}</Descriptions.Item>
@@ -222,15 +257,23 @@ const PatientsPage = () => {
         </Descriptions>}
       </Modal>
 
-      <Modal title={editingPatient ? 'Cập nhật Bệnh nhân' : 'Thêm Bệnh nhân mới'} visible={isPatientModalVisible} onOk={handleModalOk} onCancel={() => setIsPatientModalVisible(false)} okText="Lưu" cancelText="Huỷ">
+      <Modal
+        title={editingPatient ? 'Cập nhật Bệnh nhân' : 'Thêm Bệnh nhân mới'}
+        open={isPatientModalVisible}
+        onOk={handleModalOk}
+        onCancel={() => setIsPatientModalVisible(false)}
+        okText="Lưu"
+        cancelText="Huỷ"
+        confirmLoading={saveLoading}
+      >
         <Form form={form} layout="vertical">
-            <Form.Item name="ho_ten" label="Họ và tên" rules={[{ required: true }]}>
-                <Input />
+            <Form.Item name="ho_ten" label="Họ và tên" rules={[{ required: true, message: 'Vui lòng nhập họ tên' }]}>
+                <Input placeholder="Nhập họ tên đầy đủ" allowClear />
             </Form.Item>
-            <Form.Item name="ngay_sinh" label="Ngày sinh" rules={[{ required: true }]}>
-                <DatePicker style={{ width: '100%' }} />
+            <Form.Item name="ngay_sinh" label="Ngày sinh" rules={[{ required: true, message: 'Vui lòng chọn ngày sinh' }]}>
+                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Chọn ngày sinh" />
             </Form.Item>
-            <Form.Item name="gioi_tinh" label="Giới tính" rules={[{ required: true }]}>
+            <Form.Item name="gioi_tinh" label="Giới tính" rules={[{ required: true, message: 'Vui lòng chọn giới tính' }]}>
                 <Select placeholder="Chọn giới tính">
                     <Option value="Nam">Nam</Option>
                     <Option value="Nữ">Nữ</Option>
@@ -238,13 +281,13 @@ const PatientsPage = () => {
                 </Select>
             </Form.Item>
             <Form.Item name="dia_chi" label="Địa chỉ">
-                <Input />
+                <Input placeholder="Nhập địa chỉ liên hệ" allowClear />
             </Form.Item>
             <Form.Item name="so_dien_thoai" label="Số điện thoại">
-                <Input />
+                <Input placeholder="Nhập số điện thoại" allowClear />
             </Form.Item>
-            <Form.Item name="cccd" label="CCCD" rules={[{ required: true }]}>
-                <Input />
+            <Form.Item name="cccd" label="CCCD" rules={[{ required: true, message: 'Vui lòng nhập CCCD' }]}>
+                <Input placeholder="Nhập số căn cước công dân" allowClear />
             </Form.Item>
         </Form>
       </Modal>
