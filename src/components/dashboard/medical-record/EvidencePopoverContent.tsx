@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Typography, Empty, Tag, Space, Tooltip } from 'antd';
 import { FileTextOutlined } from '@ant-design/icons';
 
@@ -26,62 +26,71 @@ interface EvidencePopoverContentProps {
     summaryIdx: number;
 }
 
-const EvidencePopoverContent: React.FC<EvidencePopoverContentProps> = ({ data, summaryIdx }) => {
-    const match = data.matches.find(m => m.summary_idx === summaryIdx);
+const EvidencePopoverContent: React.FC<EvidencePopoverContentProps> = React.memo(function EvidencePopoverContent({ data, summaryIdx }) {
+    // Bolt: Optimization - Memoize the expensive grouping logic to prevent recalculation on every render.
+    // This logic iterates over all notes (potentially thousands) which is expensive.
+    const groupedNotes = useMemo(() => {
+        const match = data.matches.find(m => m.summary_idx === summaryIdx);
 
-    if (!match || match.source_indices.length === 0) {
+        if (!match || match.source_indices.length === 0) {
+            return null;
+        }
+
+        const matchingIndices = new Set(match.source_indices);
+
+        // 1. Identify relevant Source IDs (key = type + id)
+        // We want to show the FULL note if any part of it is matched.
+        const relevantSourceKeys = new Set<string>();
+        match.source_indices.forEach(idx => {
+            const note = data.notes[idx];
+            if (note) relevantSourceKeys.add(`${note.source_type}_${note.source_id}`);
+        });
+
+        // 2. Reconstruct the full notes from segments
+        // Group all segments from data.notes that belong to the identified sources
+        const grouped: Record<string, {
+            type: string,
+            id: string,
+            segments: { content: string, isMatch: boolean, score?: number }[]
+        }> = {};
+        
+        data.notes.forEach((note, idx) => {
+            const key = `${note.source_type}_${note.source_id}`;
+            
+            // Only include this note group if it contains at least one piece of evidence
+            if (relevantSourceKeys.has(key)) {
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        type: note.source_type,
+                        id: note.source_id?.toString() || '',
+                        segments: []
+                    };
+                }
+
+                const isMatch = matchingIndices.has(idx);
+                let score = 0;
+                if (isMatch) {
+                    const matchIdx = match.source_indices.indexOf(idx);
+                    score = match.scores[matchIdx];
+                }
+
+                grouped[key].segments.push({
+                    content: note.content,
+                    isMatch,
+                    score
+                });
+            }
+        });
+        return grouped;
+    }, [data, summaryIdx]);
+
+    if (!groupedNotes) {
         return (
             <div className="w-[300px] flex flex-col items-center justify-center p-4">
                 <Empty description="Không tìm thấy bằng chứng cụ thể" image={Empty.PRESENTED_IMAGE_SIMPLE} />
             </div>
         );
     }
-
-    const matchingIndices = new Set(match.source_indices);
-    
-    // 1. Identify relevant Source IDs (key = type + id)
-    // We want to show the FULL note if any part of it is matched.
-    const relevantSourceKeys = new Set<string>();
-    match.source_indices.forEach(idx => {
-        const note = data.notes[idx];
-        if (note) relevantSourceKeys.add(`${note.source_type}_${note.source_id}`);
-    });
-
-    // 2. Reconstruct the full notes from segments
-    // Group all segments from data.notes that belong to the identified sources
-    const groupedNotes: Record<string, { 
-        type: string, 
-        id: string, 
-        segments: { content: string, isMatch: boolean, score?: number }[] 
-    }> = {};
-    
-    data.notes.forEach((note, idx) => {
-        const key = `${note.source_type}_${note.source_id}`;
-        
-        // Only include this note group if it contains at least one piece of evidence
-        if (relevantSourceKeys.has(key)) {
-            if (!groupedNotes[key]) {
-                groupedNotes[key] = { 
-                    type: note.source_type, 
-                    id: note.source_id?.toString() || '', 
-                    segments: [] 
-                };
-            }
-            
-            const isMatch = matchingIndices.has(idx);
-            let score = 0;
-            if (isMatch) {
-                const matchIdx = match.source_indices.indexOf(idx);
-                score = match.scores[matchIdx];
-            }
-
-            groupedNotes[key].segments.push({
-                content: note.content,
-                isMatch,
-                score
-            });
-        }
-    });
 
     return (
         <div className="w-[550px] max-h-[500px] overflow-y-auto p-2 border border-gray-300 rounded-lg">
@@ -141,6 +150,6 @@ const EvidencePopoverContent: React.FC<EvidencePopoverContentProps> = ({ data, s
             </div>
         </div>
     );
-};
+});
 
 export default EvidencePopoverContent;
