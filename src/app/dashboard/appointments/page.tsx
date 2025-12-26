@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, Table, Button, Space, message, Spin, Tag, Modal, Form, Input, Row, Col, Select } from 'antd';
+import { Card, Table, Button, Space, message, Spin, Tag, Modal, Form, Input, Row, Col, Select, Tooltip } from 'antd';
+import { EditOutlined, EyeOutlined, DeleteOutlined } from '@ant-design/icons';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import NProgress from 'nprogress';
@@ -131,11 +132,23 @@ const MedicalRecordsWorklistPage = () => {
       key: 'action',
       render: (_: any, record: any) => (
         <Space size="middle">
-          <Button type="primary" onClick={() => handleUpdateRecord(record.id_ho_so)}>
-            {record.trang_thai === 'Đang xử lý' ? 'Cập nhật hồ sơ' : 'Xem hồ sơ'}
-          </Button>
-          {record.trang_thai === 'Đang xử lý' && 
-            <Button danger onClick={() => handleCancelRecord(record)}>Huỷ hồ sơ</Button>
+          <Tooltip title={record.trang_thai === 'Đang xử lý' ? 'Cập nhật hồ sơ' : 'Xem hồ sơ'}>
+            <Button
+              type="primary"
+              icon={record.trang_thai === 'Đang xử lý' ? <EditOutlined /> : <EyeOutlined />}
+              onClick={() => handleUpdateRecord(record.id_ho_so)}
+              aria-label={record.trang_thai === 'Đang xử lý' ? 'Cập nhật hồ sơ' : 'Xem hồ sơ'}
+            />
+          </Tooltip>
+          {record.trang_thai === 'Đang xử lý' &&
+            <Tooltip title="Huỷ hồ sơ">
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleCancelRecord(record)}
+                aria-label="Huỷ hồ sơ"
+              />
+            </Tooltip>
           }
         </Space>
       ),
