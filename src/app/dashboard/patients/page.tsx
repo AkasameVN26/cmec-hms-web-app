@@ -181,6 +181,7 @@ const PatientsPage = () => {
                         type="primary"
                         icon={<FileSearchOutlined />}
                         onClick={() => router.push(`/dashboard/appointments/${record.open_record_id}`)}
+                        aria-label="Xem hồ sơ bệnh án"
                     />
                 </Tooltip>
             ) : (
@@ -188,6 +189,7 @@ const PatientsPage = () => {
                     <Button
                         icon={<FileAddOutlined />}
                         onClick={() => handleCreateMedicalRecord(record)}
+                        aria-label="Tạo hồ sơ mới"
                     />
                 </Tooltip>
             )}
@@ -195,12 +197,14 @@ const PatientsPage = () => {
                 <Button
                     icon={<EyeOutlined />}
                     onClick={() => handleViewDetails(record)}
+                    aria-label="Chi tiết thông tin"
                 />
             </Tooltip>
             <Tooltip title="Chỉnh sửa">
                 <Button
                     icon={<EditOutlined />}
                     onClick={() => handleEdit(record)}
+                    aria-label="Chỉnh sửa"
                 />
             </Tooltip>
             <Tooltip title="Xoá bệnh nhân">
@@ -208,6 +212,7 @@ const PatientsPage = () => {
                     danger
                     icon={<DeleteOutlined />}
                     onClick={() => handleDelete(record.id_benh_nhan)}
+                    aria-label="Xoá bệnh nhân"
                 />
             </Tooltip>
         </Space>
