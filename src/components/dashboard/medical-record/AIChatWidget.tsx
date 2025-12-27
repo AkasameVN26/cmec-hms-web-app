@@ -24,7 +24,7 @@ import {
   ExclamationCircleOutlined,
   CheckCircleOutlined
 } from "@ant-design/icons";
-import EvidencePopoverContent from "./EvidencePopoverContent";
+import InteractiveSentence from "./InteractiveSentence";
 import { ExplainResponse } from "@/types/ai";
 import { aiService } from "@/services/api";
 
@@ -175,41 +175,15 @@ const AIChatWidget = ({
                       const isSelected = selectedSummaryIdx === idx;
                       
                       return (
-                          <Popover
-                            key={idx}
-                            content={<EvidencePopoverContent data={explainData} summaryIdx={idx} />}
-                            title={
-                                <Space>
-                                    <FileSearchOutlined className="text-blue-500"/> 
-                                    <span>Nguồn chứng minh</span>
-                                </Space>
-                            }
-                            trigger="click"
-                            open={isSelected}
-                            onOpenChange={(visible) => setSelectedSummaryIdx(visible ? idx : null)}
-                            placement="right"
-                            overlayInnerStyle={{ padding: 0 }}
-                          >
-                              <span
-                                className={`
-                                    inline-block px-1 rounded transition-colors duration-200 cursor-pointer mb-1 mr-1 border-b border-transparent
-                                    ${isSelected 
-                                        ? 'bg-[#b7eb8f] border-green-500' // Dark Green (Active)
-                                        : 'hover:bg-[#d9f7be] hover:border-green-300' // Light Green (Hover)
-                                    }
-                                `}
-                                title="Nhấn để xem bằng chứng"
-                              >
-                                  {sent.trim()}
-                                  {isLowSimilarity && (
-                                    <Tooltip title="Cảnh báo: Độ tin cậy thấp (Không tìm thấy nguồn khớp chính xác)">
-                                        <ExclamationCircleOutlined 
-                                            style={{ color: '#faad14', marginLeft: 4, fontSize: 12 }} 
-                                        />
-                                    </Tooltip>
-                                  )}
-                              </span>
-                          </Popover>
+                          <InteractiveSentence
+                              key={idx}
+                              sentence={sent}
+                              index={idx}
+                              explainData={explainData}
+                              isSelected={isSelected}
+                              isLowSimilarity={isLowSimilarity}
+                              onSelect={setSelectedSummaryIdx}
+                          />
                       );
                   })}
               </div>
