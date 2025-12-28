@@ -12,30 +12,19 @@ import {
   Spin,
   Tooltip,
   Tag,
-  Popover,
-  Badge
 } from "antd";
 import {
   CommentOutlined,
   CloseOutlined,
-  UserOutlined,
   RobotOutlined,
-  FileSearchOutlined,
   ExclamationCircleOutlined,
   CheckCircleOutlined
 } from "@ant-design/icons";
-import InteractiveSentence from "./InteractiveSentence";
 import { ExplainResponse } from "@/types/ai";
 import { aiService } from "@/services/api";
+import AIChatMessageItem, { Message } from "./AIChatMessageItem";
 
 const { Text } = Typography;
-
-interface Message {
-  id: string;
-  role: "user" | "ai";
-  content: string;
-  timestamp: Date;
-}
 
 const AIChatWidget = ({
   recordId,
@@ -164,47 +153,6 @@ const AIChatWidget = ({
     }
   };
 
-  // Render logic for AI messages with interactive sentences
-  const renderAiMessageContent = (msg: Message) => {
-      // Only special rendering if evidence data exists and it's not the welcome message
-      if (explainData && msg.id !== 'welcome' && !isLoading) {
-          return (
-              <div className="leading-relaxed">
-                  {explainData.summary_sentences.map((sent, idx) => {
-                      const isLowSimilarity = explainData.low_similarity_matches.some(m => m.summary_idx === idx);
-                      const isSelected = selectedSummaryIdx === idx;
-                      
-                      return (
-                          <InteractiveSentence
-                              key={idx}
-                              sentence={sent}
-                              index={idx}
-                              explainData={explainData}
-                              isSelected={isSelected}
-                              isLowSimilarity={isLowSimilarity}
-                              onSelect={setSelectedSummaryIdx}
-                          />
-                      );
-                  })}
-              </div>
-          );
-      }
-      
-      // Show loading state specifically for explanation if main loading is done but explain is pending
-      if (isExplainLoading && msg.id !== 'welcome') {
-           return (
-               <div>
-                   <Text style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{msg.content}</Text>
-                   <div className="mt-2 text-xs text-blue-500 flex items-center gap-2">
-                       <Spin size="small" /> Đang phân tích nguồn chứng minh...
-                   </div>
-               </div>
-           );
-      }
-
-      return <Text style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{msg.content}</Text>;
-  };
-
   return (
     <>
       <FloatButton
@@ -270,50 +218,14 @@ const AIChatWidget = ({
                         item.role === "user" ? "flex-end" : "flex-start",
                     }}
                     >
-                    <div
-                        style={{
-                        display: "flex",
-                        flexDirection:
-                            item.role === "user" ? "row-reverse" : "row",
-                        maxWidth: "95%",
-                        gap: 12,
-                        alignItems: "flex-start",
-                        }}
-                    >
-                        <Avatar
-                        size="small"
-                        icon={
-                            item.role === "user" ? (
-                            <UserOutlined />
-                            ) : (
-                            <RobotOutlined />
-                            )
-                        }
-                        style={{
-                            backgroundColor:
-                            item.role === "user" ? "#87d068" : "#1890ff",
-                            flexShrink: 0,
-                            marginTop: 4
-                        }}
+                        <AIChatMessageItem
+                            item={item}
+                            isLoading={isLoading}
+                            isExplainLoading={isExplainLoading}
+                            explainData={explainData}
+                            selectedSummaryIdx={selectedSummaryIdx}
+                            onSelectSummary={setSelectedSummaryIdx}
                         />
-                        <div
-                        style={{
-                            backgroundColor:
-                            item.role === "user" ? "#95de64" : "#ffffff",
-                            padding: "10px 14px",
-                            borderRadius: "16px",
-                            borderTopRightRadius:
-                            item.role === "user" ? "4px" : "16px",
-                            borderTopLeftRadius:
-                            item.role === "ai" ? "4px" : "16px",
-                            boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                            maxWidth: "100%",
-                        }}
-                        >
-                            {/* Render Content */}
-                            {item.role === 'ai' ? renderAiMessageContent(item) : <Text style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{item.content}</Text>}
-                        </div>
-                    </div>
                     </List.Item>
                 )}
                 />
