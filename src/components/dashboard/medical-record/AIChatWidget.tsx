@@ -158,12 +158,15 @@ const AIChatWidget = ({
       <FloatButton
         icon={<CommentOutlined />}
         type="primary"
-        tooltip={!isOpen ? "Chat với AI" : undefined}
+        tooltip={!isOpen ? "Chat với AI" : "Đóng chat"}
+        aria-label={!isOpen ? "Mở chat AI" : "Đóng chat"}
         onClick={() => setIsOpen(!isOpen)}
         style={{ right: 24, bottom: 24, width: 56, height: 56 }}
       />
 
         <Card
+          role="region"
+          aria-label="Cửa sổ chat AI"
           className={`fixed bottom-[90px] right-[24px] h-[600px] z-[1000] flex flex-col shadow-2xl rounded-xl border border-gray-300 transition-all duration-300 ease-in-out transform
             ${isOpen ? "scale-100 opacity-100 visible" : "scale-95 opacity-0 invisible pointer-events-none"}`}
           style={{ width: 480 }} // Fixed width, no split screen
@@ -187,6 +190,7 @@ const AIChatWidget = ({
             <Button
               type="text"
               icon={<CloseOutlined />}
+              aria-label="Đóng cửa sổ chat"
               onClick={() => { setIsOpen(false); setSelectedSummaryIdx(null); }}
             />
           }
