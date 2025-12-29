@@ -37,6 +37,7 @@ const AIChatWidget = ({
   // Explain / Evidence States
   const [isExplainLoading, setIsExplainLoading] = useState(false);
   const [explainData, setExplainData] = useState<ExplainResponse | null>(null);
+  const [explainedMessageId, setExplainedMessageId] = useState<string | null>(null);
   
   // Track which sentence is currently selected (clicked)
   const [selectedSummaryIdx, setSelectedSummaryIdx] = useState<number | null>(null);
@@ -61,13 +62,17 @@ const AIChatWidget = ({
   }, [messages, isOpen, explainData]);
 
   // Function to fetch explanation/evidence data
-  const handleFetchEvidence = async (contentOverride?: string) => {
+  const handleFetchEvidence = async (contentOverride?: string, messageId?: string) => {
       // Use override content if provided, otherwise find the last AI message
       let summaryText = contentOverride;
+      let targetId = messageId;
       
       if (!summaryText) {
         const lastAiMsg = [...messages].reverse().find(m => m.role === 'ai' && m.id !== 'welcome');
-        if (lastAiMsg) summaryText = lastAiMsg.content;
+        if (lastAiMsg) {
+            summaryText = lastAiMsg.content;
+            targetId = lastAiMsg.id;
+        }
       }
       
       if (!summaryText) return;
@@ -76,6 +81,9 @@ const AIChatWidget = ({
       // For now, we always fetch to be safe or if re-summarized
       
       setIsExplainLoading(true);
+      // Bolt: Set the target message ID so only that message becomes interactive
+      setExplainedMessageId(targetId || null);
+
       try {
           const data = await aiService.fetchExplanation(recordId, summaryText);
           setExplainData(data);
@@ -89,6 +97,7 @@ const AIChatWidget = ({
   const handleSummarizeRecord = async () => {
     setIsLoading(true);
     setExplainData(null); // Reset evidence data
+    setExplainedMessageId(null);
     setSelectedSummaryIdx(null);
 
     const userMsg: Message = {
@@ -137,7 +146,8 @@ const AIChatWidget = ({
       }
       
       // Auto fetch evidence immediately after summary finishes
-      await handleFetchEvidence(aiContent);
+      // Bolt: Pass aiMsgId explicitly to ensure we target the correct message
+      await handleFetchEvidence(aiContent, aiMsgId);
 
     } catch (error: any) {
       console.error("Error summarizing:", error);
@@ -229,6 +239,7 @@ const AIChatWidget = ({
                             explainData={explainData}
                             selectedSummaryIdx={selectedSummaryIdx}
                             onSelectSummary={setSelectedSummaryIdx}
+                            isInteractive={explainedMessageId === item.id}
                         />
                     </List.Item>
                 )}
