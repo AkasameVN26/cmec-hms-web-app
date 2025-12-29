@@ -81,6 +81,8 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
   const [conclusionForm] = Form.useForm();
   const [noteForm] = Form.useForm(); // Form for Notes
   const [updatingDiagnosis, setUpdatingDiagnosis] = useState(false);
+  const [concludingLoading, setConcludingLoading] = useState(false);
+  const [savingNoteLoading, setSavingNoteLoading] = useState(false);
   const [medicines, setMedicines] = useState<any[]>([]);
 
   // Note Management State
@@ -355,6 +357,7 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
 
   const handleConcludeOk = async () => {
     try {
+      setConcludingLoading(true);
       const values = await conclusionForm.validateFields();
 
       // 1. Sync Diagnoses (Delete old, Insert new) - Similar to handleSaveDiagnoses
@@ -407,11 +410,14 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
       message.error(
         "Lỗi: " + (info.message || "Vui lòng kiểm tra lại thông tin.")
       );
+    } finally {
+      setConcludingLoading(false);
     }
   };
 
   const handleSaveNote = async () => {
     try {
+      setSavingNoteLoading(true);
       const values = await noteForm.validateFields();
 
       console.log("Saving note with values:", values);
@@ -462,6 +468,8 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
       message.error(
         "Lỗi lưu ghi chú: " + (err.message || "Vui lòng kiểm tra lại thông tin")
       );
+    } finally {
+      setSavingNoteLoading(false);
     }
   };
 
@@ -1021,7 +1029,12 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
           // If in Note tab and creating note, user should use "Save Note".
           // If in Diagnosis or Prescription tab, user uses "Complete".
           (conclusionActiveTab !== "1" || noteViewMode === "list") && (
-            <Button key="submit" type="primary" onClick={handleConcludeOk}>
+            <Button
+              key="submit"
+              type="primary"
+              onClick={handleConcludeOk}
+              loading={concludingLoading}
+            >
               Hoàn tất Khám & Kê đơn
             </Button>
           ),
@@ -1189,7 +1202,11 @@ const MedicalRecordDetailPage = ({ params }: { params: { id: string } }) => {
                         style={{ fontFamily: "monospace" }}
                       />
                     </Form.Item>
-                    <Button type="primary" onClick={handleSaveNote}>
+                    <Button
+                      type="primary"
+                      onClick={handleSaveNote}
+                      loading={savingNoteLoading}
+                    >
                       {editingNote ? "Lưu thay đổi" : "Lưu ghi chú"}
                     </Button>
                   </Form>

@@ -265,7 +265,7 @@ const NewAppointmentPage = () => {
       >
         <Form form={patientForm} layout="vertical" onFinish={onAddPatientFinish}>
           <Form.Item name="ho_ten" label="Họ và tên" rules={[{ required: true }]}>
-            <Input />
+            <Input autoFocus />
           </Form.Item>
           <Form.Item name="ngay_sinh" label="Ngày sinh" rules={[{ required: true }]}>
             <DatePicker style={{ width: '100%' }} />
