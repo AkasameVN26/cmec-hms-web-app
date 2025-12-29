@@ -118,7 +118,7 @@ const EvidencePopoverContent: React.FC<EvidencePopoverContentProps> = React.memo
                         </div>
 
                         {/* Content of the Note (Reconstructed from segments) */}
-                        <div className="p-4 text-sm leading-relaxed text-gray-800 text-justify">
+                        <div className="p-4 text-sm leading-relaxed text-gray-800 text-justify whitespace-pre-wrap">
                             {group.segments.map((seg, sIdx) => {
                                 // Logic to render highlighted text or normal text
                                 if (seg.isMatch) {
