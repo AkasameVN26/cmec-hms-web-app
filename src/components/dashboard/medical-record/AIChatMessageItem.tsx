@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Avatar, Typography, Spin } from "antd";
 import {
   UserOutlined,
@@ -23,6 +23,7 @@ interface AIChatMessageItemProps {
   explainData: ExplainResponse | null;
   selectedSummaryIdx: number | null;
   onSelectSummary: (idx: number | null) => void;
+  isInteractive?: boolean; // Bolt: New prop to control interactivity
 }
 
 const AIChatMessageItem = React.memo(
@@ -33,17 +34,25 @@ const AIChatMessageItem = React.memo(
     explainData,
     selectedSummaryIdx,
     onSelectSummary,
+    isInteractive = false,
   }: AIChatMessageItemProps) => {
+
+    // Bolt: Optimization - Memoize the set of low similarity indices for O(1) lookup
+    // This avoids O(N*M) complexity when rendering the list of sentences.
+    const lowSimilarityIndices = useMemo(() => {
+        if (!explainData) return new Set<number>();
+        return new Set(explainData.low_similarity_matches.map(m => m.summary_idx));
+    }, [explainData]);
+
     // Render logic for AI messages with interactive sentences
     const renderAiMessageContent = () => {
-      // Only special rendering if evidence data exists and it's not the welcome message
-      if (explainData && item.id !== "welcome" && !isLoading) {
+      // Bolt: Only render interactive content if this message is the one being explained
+      if (explainData && isInteractive && !isLoading) {
         return (
           <div className="leading-relaxed">
             {explainData.summary_sentences.map((sent, idx) => {
-              const isLowSimilarity = explainData.low_similarity_matches.some(
-                (m) => m.summary_idx === idx
-              );
+              // Bolt: Use Set lookup instead of .some()
+              const isLowSimilarity = lowSimilarityIndices.has(idx);
               const isSelected = selectedSummaryIdx === idx;
 
               return (
@@ -63,7 +72,11 @@ const AIChatMessageItem = React.memo(
       }
 
       // Show loading state specifically for explanation if main loading is done but explain is pending
-      if (isExplainLoading && item.id !== "welcome") {
+      // And ONLY if this is the message waiting for explanation (we assume last AI message logic upstream handles this,
+      // but here we can check if it's the *latest* interactive one or similar.
+      // However, `isInteractive` is true only after fetch. Before fetch, we don't know ID match?
+      // Actually `handleFetchEvidence` sets ID before fetch starts. So `isInteractive` is true during loading too.)
+      if (isExplainLoading && isInteractive && item.id !== "welcome") {
         return (
           <div>
             <Text style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>
@@ -131,22 +144,35 @@ const AIChatMessageItem = React.memo(
     // 1. If message reference changed (e.g. streaming update), re-render
     if (prev.item !== next.item) return false;
 
-    // 2. If global loading states changed, re-render (simplistic but safe)
+    // 2. If global loading states changed, re-render
     if (prev.isLoading !== next.isLoading) return false;
-    if (prev.isExplainLoading !== next.isExplainLoading) return false;
 
-    // 3. If explainData changed, re-render
-    if (prev.explainData !== next.explainData) return false;
+    // Bolt: Only re-render for explainLoading if this message is involved
+    if (prev.isExplainLoading !== next.isExplainLoading) {
+        // If we are interactive, we care about loading state
+        if (next.isInteractive) return false;
+        // If we WERE interactive, we care
+        if (prev.isInteractive) return false;
+    }
+
+    // Bolt: Check if interactivity status changed
+    if (prev.isInteractive !== next.isInteractive) return false;
+
+    // 3. If explainData changed
+    if (prev.explainData !== next.explainData) {
+        // Only re-render if we are interactive
+        if (next.isInteractive) return false;
+    }
 
     // 4. Handle selectedSummaryIdx changes
     // Only re-render if:
-    // a) This is an AI message (user messages don't care about selection)
-    // b) We have explainData (interactive mode active)
+    // a) This is an AI message
+    // b) We are interactive
     // c) The selection actually changed
     if (
       prev.selectedSummaryIdx !== next.selectedSummaryIdx &&
       next.item.role === "ai" &&
-      next.explainData
+      next.isInteractive
     ) {
       return false; // Re-render to update highlights
     }
