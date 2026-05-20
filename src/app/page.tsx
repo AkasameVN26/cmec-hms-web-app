@@ -1,186 +1,49 @@
-"use client";
-
-import { useState, useEffect } from "react";
-import {
-  Layout,
-  Button,
-  Typography,
-  Card,
-  Spin,
-  Descriptions,
-  Space,
-  Divider,
-  Row,
-  Col,
-  message,
-} from "antd";
-import {
-  LoginOutlined,
-  SolutionOutlined,
-  PhoneOutlined,
-  MailOutlined,
-  GlobalOutlined,
-  HomeOutlined,
-} from "@ant-design/icons";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-import NProgress from "nprogress";
-
-const { Header, Content, Footer } = Layout;
-const { Title, Text, Link } = Typography;
-
-const LandingPage = () => {
-  const [hospitalInfo, setHospitalInfo] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-
-  useEffect(() => {
-    const fetchInfo = async () => {
-      setLoading(true);
-      const { data, error } = await supabase.rpc("get_public_hospital_info");
-      if (error) {
-        message.error("Không thể tải thông tin bệnh viện.");
-      } else {
-        const info = Array.isArray(data) ? data[0] : data;
-        if (info) {
-            setHospitalInfo(info);
-        } else {
-            message.warning('Không tìm thấy thông tin bệnh viện trong cơ sở dữ liệu.');
-            setHospitalInfo(null); // Ensure it's null if no data
-        }
-      }
-      setLoading(false);
-    };
-    fetchInfo();
-  }, []);
-
-  const handleNavigate = (path: string) => {
-    NProgress.start();
-    router.push(path);
-  };
-
-  return (
-    <Layout style={{ minHeight: "100vh", background: "#f0f2f5" }}>
-      <Header
-        style={{
-          background: "#fff",
-          padding: "0 24px",
-          borderBottom: "1px solid #f0f0f0",
-        }}
-      >
-        <Title level={3} style={{ color: "#1890ff", margin: "16px 0" }}>
-          {loading ? "Đang tải..." : (hospitalInfo ? hospitalInfo.ten_benh_vien : "Hệ thống CMEC")}
-        </Title>
-      </Header>
-      <Content style={{ padding: "48px" }}>
-        <Spin spinning={loading}>
-          <Row justify="center">
-            <Col xs={24} md={20} lg={16}>
-              <Card style={{ textAlign: "center" }}>
-                <Title level={1}>
-                  Chào mừng đến với{" "}
-                  {loading ? "..." : (hospitalInfo?.ten_benh_vien || "Bệnh viện của chúng tôi")}
-                </Title>
-                <Text type="secondary" style={{ fontSize: "16px" }}>
-                  Chúng tôi cam kết cung cấp dịch vụ chăm sóc sức khỏe tận tâm
-                  và chất lượng cao.
-                </Text>
-                <Divider />
-                <Space direction="vertical" size="large">
-                  <Row gutter={[16, 16]} justify="center">
-                    <Col>
-                      <Button
-                        type="primary"
-                        size="large"
-                        icon={<LoginOutlined />}
-                        onClick={() => handleNavigate("/login")}
-                      >
-                        Đăng nhập nhân viên
-                      </Button>
-                    </Col>
-                    <Col>
-                      <Button
-                        size="large"
-                        icon={<SolutionOutlined />}
-                        onClick={() => handleNavigate("/portal/lookup")}
-                      >
-                        Cổng thông tin bệnh nhân
-                      </Button>
-                    </Col>
-                  </Row>
-                </Space>
-                <Divider>Thông tin liên hệ</Divider>
-                {!loading && !hospitalInfo && (
-                    <Text type="secondary">Chưa có thông tin bệnh viện để hiển thị.</Text>
-                )}
-                {hospitalInfo && (
-                  <Descriptions
-                    layout="vertical"
-                    bordered
-                    column={{ xs: 1, sm: 2, md: 3 }}
-                  >
-                    <Descriptions.Item
-                      label={
-                        <>
-                          <HomeOutlined /> Địa chỉ
-                        </>
-                      }
-                    >
-                      {hospitalInfo.dia_chi}
-                    </Descriptions.Item>
-                    <Descriptions.Item
-                      label={
-                        <>
-                          <PhoneOutlined /> Số điện thoại
-                        </>
-                      }
-                    >
-                      <Link href={`tel:${hospitalInfo.so_dien_thoai}`}>
-                        {hospitalInfo.so_dien_thoai}
-                      </Link>
-                    </Descriptions.Item>
-                    <Descriptions.Item
-                      label={
-                        <>
-                          <MailOutlined /> Email
-                        </>
-                      }
-                    >
-                      <Link href={`mailto:${hospitalInfo.email}`}>
-                        {hospitalInfo.email}
-                      </Link>
-                    </Descriptions.Item>
-                    <Descriptions.Item
-                      label={
-                        <>
-                          <GlobalOutlined /> Website
-                        </>
-                      }
-                    >
-                      <Link href={hospitalInfo.website} target="_blank">
-                        {hospitalInfo.website}
-                      </Link>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Ngày thành lập">
-                      {new Date(hospitalInfo.ngay_thanh_lap).toLocaleDateString(
-                        "vi-VN"
-                      )}
-                    </Descriptions.Item>
-                  </Descriptions>
-                )}
-              </Card>
-            </Col>
-          </Row>
-        </Spin>
-      </Content>
-      <Footer style={{ textAlign: "center", background: "#f0f2f5" }}>
-        {hospitalInfo?.ten_benh_vien || "CMEC"} ©{new Date().getFullYear()} -
-        Phát triển bởi Aura Farmers
-      </Footer>
-    </Layout>
-  );
-};
-
-export default LandingPage;
+import LandingWrapper from "@/components/landing/LandingWrapper";
+import LandingHeader from "@/components/landing/LandingHeader";
+import Footer from "@/components/Footer";
+import HeroSection from "@/components/landing/HeroSection";
+import IntroSection from "@/components/landing/IntroSection";
+import ServicesSection from "@/components/landing/ServicesSection";
+import DoctorSlider from "@/components/landing/DoctorSlider";
+import BookingForm from "@/components/landing/BookingForm";
+import NewsSection from "@/components/landing/NewsSection";
+import Testimonials from "@/components/landing/Testimonials";
+import FloatingActions from "@/components/landing/FloatingActions";
 
 export const dynamic = 'force-dynamic';
+
+export default function LandingPage() {
+  return (
+    <LandingWrapper>
+      <div className="flex flex-col min-h-screen">
+        <LandingHeader />
+        
+        <main className="flex-grow">
+          {/* Main Hero Section */}
+          <HeroSection />
+
+          {/* Introduction & Statistics */}
+          <IntroSection />
+
+          {/* Medical Services */}
+          <ServicesSection />
+
+          {/* Doctors Carousel */}
+          <DoctorSlider />
+
+          {/* Appointment Booking Form */}
+          <BookingForm />
+
+          {/* News & Events */}
+          <NewsSection />
+
+          {/* Patient Testimonials */}
+          <Testimonials />
+        </main>
+
+        <Footer />
+        <FloatingActions />
+      </div>
+    </LandingWrapper>
+  );
+}

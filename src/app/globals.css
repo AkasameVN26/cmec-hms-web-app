@@ -16,6 +16,12 @@
   }
 }
 
+/* 
+  TODO: [Bình] - Landing Page Specific Colors
+  --landing-primary: ...
+  --landing-secondary: ...
+*/
+
 body {
   color: rgb(var(--foreground-rgb));
   background: linear-gradient(
